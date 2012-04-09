@@ -1,0 +1,10 @@
+OSCuino is a full-featured implementation of the OSC 1.0 communication protocol for Arduino.
+
+Features:
+
+- Supports the four basic OSC data types (integers, floats, strings, and blobs)
+- Send and receive messages over any transport layer that implements the Arduino’s Stream Class such as Serial, EthernetUdp, MIDI, and more.
+- Address pattern matching
+- Static memory consumption
+- Compatible with Arduino 1.0 API and coding style
+- 64-bit timetags
