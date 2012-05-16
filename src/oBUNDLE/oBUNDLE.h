@@ -32,9 +32,10 @@
 #include "oMESSAGE.h"
 
 //this is approximately the static size in bytes the bundle consumes in RAM
-#ifndef OSC_BUNDLE_SIZE
-#define OSC_BUNDLE_SIZE 128
-
+#if (RAMEND < 1000)
+#define OSC_BUNDLE_SIZE 64
+#else
+#define OSC_BUNDLE_SIZE 256
 #endif
 
 class oBUNDLE
