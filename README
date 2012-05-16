@@ -14,15 +14,32 @@ OSCuino is composed of two classes: oMESSAGE and oBUNDLE. oMESSAGE contains the 
 
 #include <oMESSAGE.h>
 #include <oBUNDLE.h>
+#include <SLIPEncodedSerial.h>
 
 void setup(){
-   Serial.begin(57600);
+   SLIPSerial.begin(38400);
 }
 
-oBUNDLE bndl(Serial);
+oBUNDLE bndl(SLIPSerial); //using SLIPSerial as the transport layer
 
 void loop(){
   bndl.addMessage("/analog/0").add(analogRead(0));
   bndl.addMessage("/analog/1").add(analogRead(1)); 
   bndl.send();  
+  SLIPSerial.endTransmission();
 }
+
+
+////////////////////////////////////////////////////////////////////////
+
+SLIPSerial
+
+The source also includes an extension of the Serial object which sends and receives data using the SLIP encoding (you can read more about that here http://www.cse.iitb.ac.in/~bestin/btech-proj/slip/x365.html). This makes Max/MSP integration very simple using CNMAT's slipOSC object connected to the Serial object. The SLIPSerial object has the same methods as the Serial object except for an additional "endTransmission" method which transmits the "End Of Transmission" character (octal 300) which is the message delimiter for the SLIP encoding. 
+
+////////////////////////////////////////////////////////////////////////
+
+Installation
+
+Place the contents of the "src" folder into a file titled "libraries" inside of your Arduino Sketch search path. After restarting the Arduino IDE, those libraries should be visible under the menu Sketch->Import Library. 
+
+For the Max/MSP examples to work, you'll need to download the odot objects available at http://cnmat.berkeley.edu/downloads/odot (sorry Mac only right now) and the CNMAT Everything download http://cnmat.berkeley.edu/downloads
