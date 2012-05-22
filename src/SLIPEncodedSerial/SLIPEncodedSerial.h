@@ -7,6 +7,10 @@ Extends the Serial class to encode SLIP over serial
 
 #include <Stream.h>
 #include <HardwareSerial.h>
+#if defined(CORE_TEENSY)
+	//import the serial object
+	#include <usb_api.h>
+#endif
 
 
 #if (RAMEND < 1000)
@@ -40,13 +44,31 @@ private:
 	
 	//the ring buffer to store and read bytes
 	slip_ring_buffer * slip_buffer;
-		
+	
+	//decode incoming chars and put them in the buffer
+	void decode_SLIP(uint8_t c);
+	
+	//teensy doens't use hardwareserial
+#if defined(CORE_TEENSY)
+	usb_serial_class * serial;
+#else
 	//the serial port used
 	HardwareSerial * serial;
+#endif
+	
+	
 	
 public:
+
 	
+//different constructor for teensies
+#if defined(CORE_TEENSY)
+		SLIPEncodedSerial(usb_serial_class &, slip_ring_buffer * );
+#else
+	//the serial port used
 	SLIPEncodedSerial(HardwareSerial &, slip_ring_buffer * );
+#endif
+	
 	
 	int available();
 	int read();
@@ -59,9 +81,8 @@ public:
 	//SLIP specific method which ends a slip transmission
 	void endTransmission();
 	
-	//internal method only!
-	void _decode_SLIP(uint8_t c);
-	
+	//set the ring buffer (internal use only!)
+	void _set_ring_buffer_(slip_ring_buffer *);	
 	
 	//overwrites the Stream's write function to encode SLIP
 	size_t write(uint8_t b);

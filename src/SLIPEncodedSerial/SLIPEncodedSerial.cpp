@@ -39,7 +39,7 @@ inline unsigned char SLIPEncodedSerial::peekChar(){
 	}
 }
 
-void SLIPEncodedSerial::_decode_SLIP(uint8_t c){
+void SLIPEncodedSerial::decode_SLIP(uint8_t c){
 	//if it's the escape char
 	if (c==slipesc){
 		//then read the next one
@@ -58,10 +58,24 @@ void SLIPEncodedSerial::_decode_SLIP(uint8_t c){
 	}	
 }
 
+//void SLIPEncodedSerial::_set_ring_buffer_(slip_ring_buffer *);	
+
 /*
  CONSTRUCTOR
  */
 //instantiate with the tranmission layer
+
+//different constructor for teensies
+#if defined(CORE_TEENSY)
+SLIPEncodedSerial::SLIPEncodedSerial(usb_serial_class &s, slip_ring_buffer * buffer){
+	serial = &s;
+	bytesAvailable = 0;
+	bytesUnavailable = 0;
+	slip_buffer = buffer;
+}
+
+#else
+//use HardwareSerial
 SLIPEncodedSerial::SLIPEncodedSerial(HardwareSerial &s, slip_ring_buffer * buffer){
 	serial = &s;
 	bytesAvailable = 0;
@@ -69,11 +83,16 @@ SLIPEncodedSerial::SLIPEncodedSerial(HardwareSerial &s, slip_ring_buffer * buffe
 	slip_buffer = buffer;
 }
 
+#endif
+
 /*
  SERIAL METHODS
  */
 
 int SLIPEncodedSerial::available(){
+	while (serial->available()){
+		decode_SLIP(serial->read());	
+	}
 	return bytesAvailable;
 }
 
@@ -99,16 +118,6 @@ size_t SLIPEncodedSerial::write(uint8_t b){
 	}	
 }
 
-/*
-size_t SLIPEncodedSerial::write(uint8_t * b, int size){
-	while (size){
-		write(*b);
-		b++;
-		size--;
-	}
-}
-*/
-
 void SLIPEncodedSerial::begin(unsigned long baudrate){
 	serial->begin(baudrate);
 	bytesAvailable = 0;
@@ -133,12 +142,3 @@ void SLIPEncodedSerial::flush(){
 slip_ring_buffer _slip_buffer = { { 0 }, 0, 0};
 
 SLIPEncodedSerial SLIPSerial(Serial, &_slip_buffer);
-
-
-//called whenever the Serial object has bytes available
-void serialEvent(){
-	//put the available characters in the buffer
-	while (Serial.available()){
-		SLIPSerial._decode_SLIP(Serial.read());	
-	}
-}
