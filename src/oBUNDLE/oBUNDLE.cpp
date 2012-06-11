@@ -197,7 +197,10 @@ int oBUNDLE::receiveFrom(Stream &s){
 			default:
 				//parse the first four bytes assuming it's the message length
 				char sizeBuff[4];
-				s.readBytes(sizeBuff, 4);
+				sizeBuff[0] = s.read();
+				sizeBuff[1] = s.read();
+				sizeBuff[2] = s.read();
+				sizeBuff[3] = s.read();
 				int size = pointerToInt((uint8_t *) sizeBuff);
 				//if there is enough space in the buffer
 				if (bytesLeft >= size){
@@ -225,7 +228,10 @@ int oBUNDLE::receive(){
 bool oBUNDLE::readBundleHeader(Stream &s){
 	//read the first 16 bytes 
 	char buffer[16];
-	s.readBytes(buffer, 16);
+	for (int i = 0; i < 16; i++){
+		buffer[i] = s.read();
+	}
+	//s.readBytes(buffer, 16);
 	//should equal "#bundle0" + timetag for OSC 1.0
 	if (strncmp(buffer, "#bundle", 7)==0){
 		setTimetag((uint8_t * ) buffer+8);

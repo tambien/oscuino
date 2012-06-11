@@ -24,7 +24,6 @@
  */
 
 #include "oMESSAGE.h"
-#include <exception>
 
 
 /*

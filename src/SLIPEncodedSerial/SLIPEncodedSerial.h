@@ -84,9 +84,14 @@ public:
 	//set the ring buffer (internal use only!)
 	void _set_ring_buffer_(slip_ring_buffer *);	
 	
+//the arduino and wiring libraries have different return types for the write function
+#ifdef WIRING
+	void write(uint8_t b);
+#else
 	//overwrites the Stream's write function to encode SLIP
 	size_t write(uint8_t b);
-	//using Print::write;
+	//using Print::write;	
+#endif
 
 };
 
