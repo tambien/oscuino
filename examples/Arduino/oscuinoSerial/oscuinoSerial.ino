@@ -1,7 +1,20 @@
 /*
   This example is meant to be used with the MAX/MSP 
-  to Arduino Interface called oscuinoSerial. 
+  to Arduino Interface called oscuinoSerial.maxpatch
   
+  */
+  
+  /*
+  I can easily get rid of the itoa stuff with a big multilevel array
+  pinStrings = ["/0", "/1",... that would save some time];
+  
+  the biggest time saver would be if it could possibly not have to iterate and do a match on everything!
+  prob not possible. 
+  but the array thing is a pretty big optimization. 
+  just the pin level takes  a lot of time. 
+  
+  try and pick apart some of the cases to see where i could optimize
+  * is an easy one to optimize
   */
 
 #include <SLIPEncodedSerial.h>
@@ -288,6 +301,7 @@ void sendBundle(){
 
 void handleAnalog(oMESSAGE msg, int addrOffset ){
   char * pinNum = "/xx";
+  //if(
   for (int i = 0; i < ANALOG_PINS; i++){
     itoa(i, pinNum+1, 10);
     int additionalOffset = 0;
@@ -404,9 +418,19 @@ void handleSystem(oMESSAGE msg, int addrOffset ){
   }
   if (msg.fullMatch("/a", addrOffset)){
     bundleOUT.addMessage("/s/a").add(ANALOG_PINS);
-     
   }
 }
+
+
+int patternIsNumber(oMESSAGE msg, int addrOffset){
+  char buff[3];
+  //+1 to get rid of the '/'
+  msg.getAddress(buff, addrOffset+1, 2);
+  if (buff[0]>=48 && buff[0] <=57){
+    return atoi(buff);
+  } else return -1;
+}
+
 
 
 

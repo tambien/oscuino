@@ -23,13 +23,13 @@
  For bug reports and feature requests please email me at yotam@cnmat.berkeley.edu
  */
 
-#ifndef OBUNDLE_h
-#define OBUNDLE_h
+#ifndef OSCBUNDLE_h
+#define OSCBUNDLE_h
 
 
 #include <Stream.h>
 #include <HardwareSerial.h>
-#include "oMESSAGE.h"
+#include "OSCMessage.h"
 
 //this is approximately the static size in bytes the bundle consumes in RAM
 #if (RAMEND < 1000)
@@ -38,7 +38,7 @@
 #define OSC_BUNDLE_SIZE 256
 #endif
 
-class oBUNDLE
+class OSCBundle
 {
 
 private:
@@ -46,14 +46,14 @@ private:
 	//BUFFERS
 	
 	uint8_t OSCDataBuffer[OSC_BUNDLE_SIZE]; //stores all of the osc data
-	oMESSAGE OSCMessageBuffer[OSC_BUNDLE_SIZE/8]; //array of messages
+	OSCMessage OSCMessageBuffer[OSC_BUNDLE_SIZE/8]; //array of messages
 	
 	//TODO: allow the user to set a buffer, or the buffer size!
 	
 	//GETTING/SETTING BUFFERS
 	
-	inline oMESSAGE* currentMessage();
-	oMESSAGE* nextMessage();
+	inline OSCMessage* currentMessage();
+	OSCMessage* nextMessage();
 	uint8_t * getEndOfMessageBuffer();
 	int bufferBytesRemaining(uint8_t *);
 	
@@ -97,8 +97,8 @@ private:
 public:
 		
 	//CONSTRUCTOR
-	oBUNDLE();
-	oBUNDLE(Stream & s);
+	OSCBundle();
+	OSCBundle(Stream & s);
 	
 	//DESTRUCTOR
 	//clears the buffers/reinitialize the bundle
@@ -107,25 +107,25 @@ public:
 	//MESSAGE GETTING/SETTING
 	
 	//start a new OSC Message in the bundle
-	oMESSAGE& addMessage(char * address, int len = 1);
+	OSCMessage& addMessage(char * address, int len = 1);
 	
 	//copies an existing message into the bundle
-	oMESSAGE& addMessage(oMESSAGE msg);
+	OSCMessage& addMessage(OSCMessage msg);
 	
 	//if the bundle contains a message that matches the pattern, 
 	//call the function callback on that message
-	bool dispatch(char * pattern, void (*callback)(oMESSAGE), int = 0);
+	bool dispatch(char * pattern, void (*callback)(OSCMessage), int = 0);
 	
 	//like dispatch, but allows for partial matches
 	//the address match offset is sent as an argument to the callback
-	bool route(char * pattern, void (*callback)(oMESSAGE, int), int = 0);
+	bool route(char * pattern, void (*callback)(OSCMessage, int), int = 0);
 	
 	//gets the message the matches the address string
 	//will do regex matching
-	oMESSAGE& getMessage(char * addr);
+	OSCMessage& getMessage(char * addr);
 	
 	//get message by position
-	oMESSAGE& getMessage(int position);
+	OSCMessage& getMessage(int position);
 	
 	//returns the number of messages in the bundle;
 	int size();
@@ -154,6 +154,7 @@ public:
 	//TIMETAG GET/SET
 	
 	//sets the val of the timetag
+	void setImmediateTimetag();
 	void setTimetag(uint64_t);
 	void setTimetag(int16_t);
 	void setTimetag(uint8_t *);

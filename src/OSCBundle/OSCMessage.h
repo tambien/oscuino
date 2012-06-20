@@ -23,13 +23,12 @@
  For bug reports and feature requests please email me at yotam@cnmat.berkeley.edu
  */
 
-#ifndef OMESSAGE_h
-#define OMESSAGE_h
+#ifndef OSCMESSAGE_h
+#define OSCMESSAGE_h
 
 #include <Print.h>
 #include <Stream.h>
 #include <Printable.h>
-#include "osc_match.h"
 
 #ifndef OSC_MESSAGE_DEFAULT_BUFFER_SIZE
 #define OSC_MESSAGE_DEFAULT_BUFFER_SIZE 32
@@ -62,7 +61,7 @@ enum {
 
 //OSC MESSAGE////////////////////////////////////////////
 
-class oMESSAGE
+class OSCMessage
 {
 	
 private:
@@ -148,17 +147,17 @@ private:
 public:
 	
 	//CONSTRUCTORS
-	oMESSAGE();
+	OSCMessage();
 	
 	//create a message with an address and length
 	//this places data in a default static buffer
-	oMESSAGE& start(char * _address, int len=1);
+	OSCMessage& start(char * _address, int len=1);
 	
 	//create a message with an address and place data in the buffer
-	oMESSAGE& start(char * _address, uint8_t * buffer, int maxBytes, int len=1);
+	OSCMessage& start(char * _address, uint8_t * buffer, int maxBytes, int len=1);
 	
 	//copy the message into the message buffer
-	void copy(oMESSAGE msg);
+	void copy(OSCMessage msg);
 	
 	//resets all pointers back to the beginning
 	void reset();
@@ -183,25 +182,24 @@ public:
 	int match(const char * pattern, int = 0);
 	
 	//calls the function with the message as the arg if it was a full match
-	bool dispatch(char * pattern, void (*callback)(oMESSAGE), int = 0);
+	bool dispatch(char * pattern, void (*callback)(OSCMessage), int = 0);
 	
 	//like dispatch, but allows for partial matches
 	//the address match offset is sent as an argument to the callback
 	//also room for an option address offset to allow for multiple nested routes
-	bool route(char * pattern, void (*callback)(oMESSAGE, int), int = 0);
+	bool route(char * pattern, void (*callback)(OSCMessage, int), int = 0);
 	
 	
 	//SETTERS
 	//overloaded write method that handles all types
-	//i.e. oMESSAGE msg("/test").add(100).add("hiya").add(1.0);
-	//TODO: add is better. 
-	oMESSAGE& add(int data);
-	oMESSAGE& add(unsigned int data);
-	oMESSAGE& add(int32_t data);
-	oMESSAGE& add(float data);
-	oMESSAGE& add(double data);
-	oMESSAGE& add(char * data);
-	oMESSAGE& add(uint8_t * data, int len);
+	//i.e. OSCMessage msg("/test").add(100).add("hiya").add(1.0);
+	OSCMessage& add(int data);
+	OSCMessage& add(unsigned int data);
+	OSCMessage& add(int32_t data);
+	OSCMessage& add(float data);
+	OSCMessage& add(double data);
+	OSCMessage& add(char * data);
+	OSCMessage& add(uint8_t * data, int len);
 	
 	//TODO: DEPRECATE
 	//no more static buffer, every message will be made
@@ -224,6 +222,8 @@ public:
 	
 	//put the address in the buffer
 	int getAddress(char * buffer, int offset = 0);
+	
+	int getAddress(char * buffer, int offset, int len);
 	
 	
 	//SIZE OF MESSAGE
@@ -278,3 +278,97 @@ public:
 };
 
 #endif
+
+/*
+ Written by John MacCallum, The Center for New Music and Audio Technologies,
+ University of California, Berkeley.  Copyright (c) 2009, The Regents of
+ the University of California (Regents). 
+ Permission to use, copy, modify, distribute, and distribute modified versions
+ of this software and its documentation without fee and without a signed
+ licensing agreement, is hereby granted, provided that the above copyright
+ notice, this paragraph and the following two paragraphs appear in all copies,
+ modifications, and distributions.
+ 
+ IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
+ SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, ARISING
+ OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF REGENTS HAS
+ BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF ANY, PROVIDED
+ HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION TO PROVIDE
+ MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+ */
+
+/**
+	 * Switch this off to disable matching against a pattern with 2 stars
+	 */
+	//#define OSC_MATCH_ENABLE_2STARS		1
+	/**
+	 * Switch this off to disable matching against a pattern with more than 2 stars which will
+	 * be done recursively.
+	 */
+	//#define OSC_MATCH_ENABLE_NSTARS		1
+	
+	/**
+	 * Return code for osc_match() that indicates that the entire address was successfully matched
+	 */
+#define OSC_MATCH_ADDRESS_COMPLETE	1
+	
+	/**
+	 * Return code for osc_match() that indicates that the entire pattern was successfully matched
+	 */
+#define OSC_MATCH_PATTERN_COMPLETE	2
+	/*
+	 typedef struct _osc_callback {
+	 const char* address;			// Address
+	 struct _osc_callback *child;		// RAM
+	 struct _osc_callback *sibling;		// RAM
+	 struct _osc_callback *parent;		// RAM
+	 int callback;				// ROM
+	 } osc_callback;
+	 */
+	
+	/**
+	 * Match a pattern against an address.  In the case of a partial match, pattern_offset
+	 * and address_offset will contain the number of bytes into their respective strings
+	 * where the match failed.
+	 *
+	 * @param pattern The pattern to match
+	 * @param address The address to match
+	 * @param pattern_offset The number of bytes into the pattern that were matched successfully
+	 * @param address_offset The number of bytes into the address that were matched successfully
+	 * @return 0 if the match failed altogether, or an or'd combination of OSC_MATCH_ADDRESS_COMPLETE and
+	 * OSC_MATCH_PATTERN_COMPLETE.
+	 */
+	int osc_match(const char *pattern, const char *address, int *pattern_offset, int *address_offset);
+	
+	/**
+	 * Not to be called directly.  Called by osc_match().
+	 */
+	int osc_match_star(const char *pattern, const char *address);
+	
+	/**
+	 * Not to be called directly.  Called by osc_match().
+	 */
+	int osc_match_star_r(const char *pattern, const char *address);
+	
+	/**
+	 * Not to be called directly.  Called by osc_match().
+	 */
+	int osc_match_single_char(const char *pattern, const char *address);
+	
+	/**
+	 * Not to be called directly.  Called by osc_match().
+	 */
+	int osc_match_bracket(const char *pattern, const char *address);
+	
+	/**
+	 * Not to be called directly.  Called by osc_match().
+	 */
+	int osc_match_curly_brace(const char *pattern, const char *address);
+	
+
+
+

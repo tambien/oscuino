@@ -23,13 +23,13 @@
  For bug reports and feature requests please email me at yotam@cnmat.berkeley.edu
  */
 
-#include "oBUNDLE.h"
+#include "OSCBundle.h"
 
 /*
  CONSTRUCTOR/DESTRUCTOR
  */
 
-oBUNDLE::oBUNDLE(Stream & s){
+OSCBundle::OSCBundle(Stream & s){
 	setTimetag(1);  
 	numMessages = 0;
 	stream = &s;
@@ -37,7 +37,7 @@ oBUNDLE::oBUNDLE(Stream & s){
 	error = OSC_OK;
 }
 
-oBUNDLE::oBUNDLE(){
+OSCBundle::OSCBundle(){
 	//timetag = 1: happen instantly. 
 	setTimetag(1);  
 	numMessages = 0;
@@ -46,11 +46,11 @@ oBUNDLE::oBUNDLE(){
 }
 
 
-void oBUNDLE::clear(){
+void OSCBundle::clear(){
 	//restart message and data pointer
 	numMessages = 0;
 	//set the default timetag
-	setTimetag(1); 
+	setImmediateTimetag(); 
 	//clear the errors
 	error = OSC_OK;
 }
@@ -60,18 +60,18 @@ void oBUNDLE::clear(){
  MESSAGE SETTER/GETTERS
  */
 
-oMESSAGE* oBUNDLE::currentMessage(){
+OSCMessage* OSCBundle::currentMessage(){
 	return &OSCMessageBuffer[numMessages-1];
 }
 
-oMESSAGE* oBUNDLE::nextMessage(){
+OSCMessage* OSCBundle::nextMessage(){
 	if (numMessages < maxSize()) {
 		numMessages++;
 	} 
 	return currentMessage();
 }
 
-uint8_t * oBUNDLE::getEndOfMessageBuffer(){
+uint8_t * OSCBundle::getEndOfMessageBuffer(){
 	//if it's the first message
 	if (numMessages==0){
 		//the message data starts at the beginning of the buffer
@@ -82,11 +82,11 @@ uint8_t * oBUNDLE::getEndOfMessageBuffer(){
 	}
 }
 
-int oBUNDLE::bufferBytesRemaining(uint8_t * end){
+int OSCBundle::bufferBytesRemaining(uint8_t * end){
 	return (OSC_BUNDLE_SIZE - (end-OSCDataBuffer));
 }
 
-oMESSAGE& oBUNDLE::addMessage(char * _address, int len){
+OSCMessage& OSCBundle::addMessage(char * _address, int len){
 	//the next message starts at the end of the previous message's data
 	uint8_t * end = getEndOfMessageBuffer();
 	//start the message
@@ -95,12 +95,12 @@ oMESSAGE& oBUNDLE::addMessage(char * _address, int len){
 }
 
 //TODO: add a message to the bundle
-oMESSAGE& oBUNDLE::addMessage(oMESSAGE msg){
+OSCMessage& OSCBundle::addMessage(OSCMessage msg){
 
 }
 
 //returns the first fullMatch.
-oMESSAGE& oBUNDLE::getMessage(char * addr){
+OSCMessage& OSCBundle::getMessage(char * addr){
 	for (int i = 0; i < numMessages; i++){
 		if(OSCMessageBuffer[i].fullMatch(addr)){
 			return OSCMessageBuffer[i];
@@ -109,14 +109,14 @@ oMESSAGE& oBUNDLE::getMessage(char * addr){
 }
 
 //the position is the same as the order they were declared in
-oMESSAGE& oBUNDLE::getMessage(int pos){
+OSCMessage& OSCBundle::getMessage(int pos){
 	if (pos < numMessages){
 		return OSCMessageBuffer[pos];	
 	}
 	
 }
 
-bool oBUNDLE::dispatch(char * pattern, void (*callback)(oMESSAGE), int initial_offset){
+bool OSCBundle::dispatch(char * pattern, void (*callback)(OSCMessage), int initial_offset){
 	bool called = false;
 	for (int i = 0; i < numMessages; i++){
 		called |= OSCMessageBuffer[i].dispatch(pattern, callback, initial_offset);
@@ -125,7 +125,7 @@ bool oBUNDLE::dispatch(char * pattern, void (*callback)(oMESSAGE), int initial_o
 }
 
 
-bool oBUNDLE::route(char * pattern, void (*callback)(oMESSAGE, int), int initial_offset){
+bool OSCBundle::route(char * pattern, void (*callback)(OSCMessage, int), int initial_offset){
 	bool called = false;
 	for (int i = 0; i < numMessages; i++){
 		called |= OSCMessageBuffer[i].route(pattern, callback, initial_offset);
@@ -133,12 +133,16 @@ bool oBUNDLE::route(char * pattern, void (*callback)(oMESSAGE, int), int initial
 	return called;
 }
 
-int oBUNDLE::size(){
+int OSCBundle::size(){
 	return numMessages;
 }
 
-int oBUNDLE::maxSize(){
+int OSCBundle::maxSize(){
 	return OSC_BUNDLE_SIZE/8;
+}
+
+bool OSCBundle::isFull(){
+	return currentMessage()->hasError()==1;
 }
 
 /*
@@ -147,11 +151,11 @@ int oBUNDLE::maxSize(){
 
 //output a bundle of all of the messages to the stream
 //clears the buffers
-void oBUNDLE::send(){ 
+void OSCBundle::send(){ 
 	sendTo(*stream);
 }
 
-void oBUNDLE::sendTo(Print &p){
+void OSCBundle::sendTo(Print &p){
 	//bundle header OSC 1.0
 	p.write("#bundle");	
 	p.write((uint8_t)0); //pad bundle
@@ -176,7 +180,7 @@ void oBUNDLE::sendTo(Print &p){
  RECEIVING MESSAGES
  */
 
-int oBUNDLE::receiveFrom(Stream &s){
+int OSCBundle::receiveFrom(Stream &s){
 	clear();
 	bool valid = true;
 	while((s.available() > 0) && valid){
@@ -220,12 +224,12 @@ int oBUNDLE::receiveFrom(Stream &s){
 	}
 }
 
-int oBUNDLE::receive(){
+int OSCBundle::receive(){
 	receiveFrom(*stream);
 }
 
 
-bool oBUNDLE::readBundleHeader(Stream &s){
+bool OSCBundle::readBundleHeader(Stream &s){
 	//read the first 16 bytes 
 	char buffer[16];
 	for (int i = 0; i < 16; i++){
@@ -242,7 +246,7 @@ bool oBUNDLE::readBundleHeader(Stream &s){
 
 }
 
-void oBUNDLE::emptyIncomingStream(Stream &s){
+void OSCBundle::emptyIncomingStream(Stream &s){
 	while(s.available())
 		s.read();
 }
@@ -254,15 +258,15 @@ void oBUNDLE::emptyIncomingStream(Stream &s){
  TODO: make some kind of real timing capabilities here
  */
 
-uint8_t * oBUNDLE::getTimetag(){
+uint8_t * OSCBundle::getTimetag(){
 	return timetag;
 }
 
-void oBUNDLE::setTimetag(uint64_t time){
+void OSCBundle::setTimetag(uint64_t time){
 	//timetag = time;
 }
 
-void oBUNDLE::setTimetag(int16_t time){
+void OSCBundle::setTimetag(int16_t time){
 	uint8_t * timePtr = (uint8_t *) time;
 	timetag[LongMSB3] = 0;
 	timetag[LongMSB2] = 0;
@@ -274,7 +278,18 @@ void oBUNDLE::setTimetag(int16_t time){
 	timetag[LongLSB0] = *timePtr++;
 }
 
-void oBUNDLE::setTimetag(uint8_t * time){
+void OSCBundle::setImmediateTimetag(){
+	timetag[LongMSB3] = 0;
+	timetag[LongMSB2] = 0;
+	timetag[LongMSB1] = 0;
+	timetag[LongMSB0] = 0;
+	timetag[LongLSB3] = 0;
+	timetag[LongLSB2] = 0;
+	timetag[LongLSB1] = 0;
+	timetag[LongLSB0] = 1;
+}
+
+void OSCBundle::setTimetag(uint8_t * time){
 	timetag[LongMSB3] = *time++;
 	timetag[LongMSB2] = *time++;
 	timetag[LongMSB1] = *time++;
@@ -285,7 +300,7 @@ void oBUNDLE::setTimetag(uint8_t * time){
 	timetag[LongLSB0] = *time++;
 }
 
-void oBUNDLE::printTimetag(Print &p){
+void OSCBundle::printTimetag(Print &p){
 	p.write(timetag[LongMSB3]);
 	p.write(timetag[LongMSB2]);
 	p.write(timetag[LongMSB1]);
@@ -298,7 +313,7 @@ void oBUNDLE::printTimetag(Print &p){
 
 //POINTER/INT TRANSLATION
 
-int oBUNDLE::pointerToInt(uint8_t * ptr){
+int OSCBundle::pointerToInt(uint8_t * ptr){
 	union {
 		int32_t i;
 		uint8_t b[4];
@@ -310,7 +325,7 @@ int oBUNDLE::pointerToInt(uint8_t * ptr){
 	return u.i;
 }
 
-void oBUNDLE::printInt(int i, Print &p){
+void OSCBundle::printInt(int i, Print &p){
 	union {
 		int32_t i;
 		uint8_t b[4];
@@ -322,7 +337,7 @@ void oBUNDLE::printInt(int i, Print &p){
 	p.write(u.b[LSB0]);
 }
 
-void oBUNDLE::intToPointer(uint8_t * buffer, int i){
+void OSCBundle::intToPointer(uint8_t * buffer, int i){
 	uint8_t * ptr = (uint8_t *) (& i);
 	*buffer++ = ptr[MSB1];
 	*buffer++ = ptr[MSB0];
