@@ -132,7 +132,7 @@ inline void digitalPullup(uint8_t pin, boolean b) {
 	digitalWrite(pin, b?HIGH:LOW); 
 }
 
-#if defined(__AVR_ATmega1280__)
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
 #define ANALOG_PINS 16
 const int DIGITAL_PINS=54;
 inline void analogPullup(uint8_t pin, boolean b) { 
