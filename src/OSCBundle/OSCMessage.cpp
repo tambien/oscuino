@@ -455,7 +455,9 @@ float OSCMessage::getFloat(){
 }
 
 bool OSCMessage::isFloat(){
-	return (getType()=='f');
+	char t = getType();
+	//if the type is double or float
+	return (t=='f')||(t=='d');
 }
 
 /*
@@ -522,7 +524,14 @@ bool OSCMessage::isBlob(){
  PRINTING
  */
 
+//DEPRECATE in favor of sendTo
 void OSCMessage::printTo(Print &p){
+	if (!error){
+		p.write(msgData, msgBytes);
+	}
+}
+
+void OSCMessage::sendTo(Print &p){
 	if (!error){
 		p.write(msgData, msgBytes);
 	}

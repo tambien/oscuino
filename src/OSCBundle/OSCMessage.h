@@ -255,8 +255,12 @@ public:
 
 	//OUTPUT
 	
-	//print the full message
+	//DEPRECATE IN PLACE OF sendTo 
+	//for consistency between OSCMEssage and OSCBundle
 	void printTo(Print &p);
+	
+	//print the full message
+	void sendTo(Print &p);
 	
 	
 	//TODO: DEPRECATE
