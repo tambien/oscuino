@@ -305,15 +305,22 @@ public:
  MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
-/**
+#ifndef __OSC_MATCH_H__
+#define __OSC_MATCH_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+	
+	/**
 	 * Switch this off to disable matching against a pattern with 2 stars
 	 */
-	//#define OSC_MATCH_ENABLE_2STARS		1
+//#define OSC_MATCH_ENABLE_2STARS		1
 	/**
 	 * Switch this off to disable matching against a pattern with more than 2 stars which will
 	 * be done recursively.
 	 */
-	//#define OSC_MATCH_ENABLE_NSTARS		1
+//#define OSC_MATCH_ENABLE_NSTARS		1
 	
 	/**
 	 * Return code for osc_match() that indicates that the entire address was successfully matched
@@ -348,31 +355,8 @@ public:
 	 */
 	int osc_match(const char *pattern, const char *address, int *pattern_offset, int *address_offset);
 	
-	/**
-	 * Not to be called directly.  Called by osc_match().
-	 */
-	int osc_match_star(const char *pattern, const char *address);
-	
-	/**
-	 * Not to be called directly.  Called by osc_match().
-	 */
-	int osc_match_star_r(const char *pattern, const char *address);
-	
-	/**
-	 * Not to be called directly.  Called by osc_match().
-	 */
-	int osc_match_single_char(const char *pattern, const char *address);
-	
-	/**
-	 * Not to be called directly.  Called by osc_match().
-	 */
-	int osc_match_bracket(const char *pattern, const char *address);
-	
-	/**
-	 * Not to be called directly.  Called by osc_match().
-	 */
-	int osc_match_curly_brace(const char *pattern, const char *address);
-	
+#ifdef __cplusplus
+}
+#endif
 
-
-
+#endif // __OSC_MATCH_H__
