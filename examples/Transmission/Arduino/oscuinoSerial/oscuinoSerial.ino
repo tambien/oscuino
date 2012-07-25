@@ -189,7 +189,7 @@ void handleDigital(OSCMessage msg, int addrOffset ){
       //if it has an value then it's an output with that value
       if (msg.isInt()){
         pinMode(pin, OUTPUT);
-        analogOutWrite(pin, msg.getInt()); 
+        digitalWrite(pin, msg.getInt()); 
       } 
       else { 
         boolean pullup = false;
