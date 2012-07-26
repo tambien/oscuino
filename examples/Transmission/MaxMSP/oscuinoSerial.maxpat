@@ -26,36 +26,6 @@
 		"devicewidth" : 0.0,
 		"boxes" : [ 			{
 				"box" : 				{
-					"maxclass" : "o.message",
-					"text" : "/d/10 0 ",
-					"textcolor" : [ 0.0, 0.0, 0.0, 1.0 ],
-					"fontsize" : 14.0,
-					"id" : "obj-5",
-					"numinlets" : 2,
-					"numoutlets" : 1,
-					"patching_rect" : [ 290.0, 685.0, 194.0, 22.0 ],
-					"fontname" : "Andale Mono",
-					"outlettype" : [ "" ]
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"maxclass" : "o.message",
-					"text" : "/d/9 0 ",
-					"textcolor" : [ 0.0, 0.0, 0.0, 1.0 ],
-					"fontsize" : 14.0,
-					"id" : "obj-1",
-					"numinlets" : 2,
-					"numoutlets" : 1,
-					"patching_rect" : [ 80.0, 685.0, 194.0, 22.0 ],
-					"fontname" : "Andale Mono",
-					"outlettype" : [ "" ]
-				}
-
-			}
-, 			{
-				"box" : 				{
 					"maxclass" : "comment",
 					"text" : "reconnect to the Arduino",
 					"fontsize" : 14.0,
@@ -182,7 +152,7 @@
 , 			{
 				"box" : 				{
 					"maxclass" : "o.message",
-					"text" : "/a/1 1023 ",
+					"text" : " ",
 					"textcolor" : [ 0.0, 0.0, 0.0, 1.0 ],
 					"fontsize" : 14.0,
 					"id" : "obj-36",
@@ -1140,24 +1110,6 @@
 			}
  ],
 		"lines" : [ 			{
-				"patchline" : 				{
-					"source" : [ "obj-5", 0 ],
-					"destination" : [ "obj-25", 0 ],
-					"hidden" : 0,
-					"midpoints" : [  ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"source" : [ "obj-1", 0 ],
-					"destination" : [ "obj-25", 0 ],
-					"hidden" : 0,
-					"midpoints" : [  ]
-				}
-
-			}
-, 			{
 				"patchline" : 				{
 					"source" : [ "obj-42", 0 ],
 					"destination" : [ "obj-25", 0 ],
