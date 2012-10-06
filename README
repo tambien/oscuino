@@ -9,6 +9,73 @@ Features:
 - Compatible with Arduino 1.0 API and coding style
 - 64-bit timetags
 
+////////////////////////////////////////////////////////////////////////
+API
+
+ANALOG
+These are the basic analog Arduino functions with the option of using the internal pullup available on most Arduinos. All analog pins can be used as digital outputs also. 
+
+/a/(pin #)
+	(no data) = analogRead with pullup off
+	/u = analogRead with pullup on
+	(value 0/1) = digitalWrite with that value
+
+example:
+"/a/0/u" performs analogRead with pullup on on pin 0. 
+"/a/8 1" performs digitalWrite on pin 8 of HIGH.
+
+DIGITAL
+The basic digital Arduino functions with the option of using the internal pullup available on most Arduinos. 
+
+/d/(pin #)
+	(no data) = digitalRead with pullup off
+	/u = digitalRead with pullup on
+	(value 0/1) = digitalWrite with that value
+
+example:
+"/d/1" performs digitalRead with pullup off on pin 0. 
+"/d/[0-4] 0" performs digitalWrite LOW on pins 0 through 4.
+
+PWM
+PWM can be called on all pins with an automatic fallback to software PWM using the SoftPWM library on pins that don't support hardware PWM. Software PWM needs to be turned off if you want to use that pin for anything else, otherwise it will continue to update the pin.
+
+/p/(pin #)
+	(value 0-255) = analogWrite with that value
+	/e = ends the SoftPWM on that pin
+	/h = returns 0/1 if the pin has hardware PWM. 
+
+
+
+example:
+"/p/0 128" sets the PWM on pin 0
+"/d/0/h" returns 1 if pin 0 has hardware PWM
+
+SERVO
+Arduino supports up to 8 servos. Attach the servo to a specific pin and detach the servo if you want to use that pin for something else. This uses Arduino's Servo library. 
+
+/v/(servo # 0-7)
+	(value 0-179) = writes that angle to the servo
+	/a (pin) = attach the servo to a pin
+ 	/e = detach the servo from the pin 
+
+example:
+"/v/1 1" attach servo 1 to pin 1.
+"/v/1 90" moves servo 1 to 90 degrees
+
+STEPPER
+The stepper is by default disabled. Change STEPPER_ENABLED to 1 in the sketch to enable it and select the pins that you want the stepper to use. This uses Arduino's Stepper library. 
+
+/t
+	(value) = step to that value
+	/s = set the stepper speed
+
+example:
+"/t 20" steps 20 steps. 
+"/t 50" sets the stepper speed to 50 rpm. 
+
+////////////////////////////////////////////////////////////////////////
+GETTING STARTED
+
 OSCuino is composed of two classes: oMESSAGE and oBUNDLE. oMESSAGE contains the address, type, and data and oBUNDLE is a bundle of oMESSAGEs with a timetag. To start sending data over the Arduino’s Serial port simply construct an oBUNDLE with Serial as the constructor argument, add some oMESSAGEs with some data, and send it off:
 
 
