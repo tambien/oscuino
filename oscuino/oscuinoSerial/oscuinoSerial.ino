@@ -153,6 +153,15 @@ void routePWM(OSCMessage msg, int addrOffset ){
     if(pinMatched){
       //reset the message in case its a pattern being matched mutliple times
       msg.reset();
+       //tests if the pin is hardware PWM
+      if (msg.fullMatch("/h", addrOffset+pinMatched)){
+         char outputAddress[9];
+        strcpy(outputAddress, "/p");
+        strcat(outputAddress, numToOSCAddress(pin));
+        strcat(outputAddress,"/h");
+        //do the analog read and send the results
+        bundleOUT.addMessage(outputAddress).add(digitalPinHasPWM(pin));   
+      }
       //test if that pin is a PWM
       if (digitalPinHasPWM(pin)){
         //if it is, then analog write
@@ -247,12 +256,16 @@ void routeServo(OSCMessage msg, int addrOffset ){
  * attached to since there is no way to detach the stepper from the pins
  */
 
+//change to 1 to enable the stepper
 #define STEPPER_ENABLED 0
+//change the pins to the pins you want to use
+#define STEPPER_PIN0 4
+#define STEPPER_PIN1 5
 
 #if STEPPER_ENABLED
 
 //the stepper object
-Stepper stepper = Stepper(100, 4, 5);
+Stepper stepper = Stepper(100, STEPPER_PIN0, STEPPER_PIN1);
 
 void routeStepper(OSCMessage msg, int addrOffset ){
   //set the speed if the next part of the address matches "/s"
