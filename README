@@ -22,7 +22,7 @@ These are the basic analog Arduino functions with the option of using the intern
 
 example:
 "/a/0/u" performs analogRead with pullup on on pin 0. 
-"/a/8 1" performs digitalWrite on pin 8 of HIGH.
+"/a/8 1" performs digitalWrite on pin 8 with HIGH.
 
 DIGITAL
 The basic digital Arduino functions with the option of using the internal pullup available on most Arduinos. 
