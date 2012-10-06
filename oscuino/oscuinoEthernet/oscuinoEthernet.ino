@@ -2,7 +2,15 @@
 #include <Ethernet.h>
 #include <EthernetUdp.h>
 #include <OSCBundle.h>
+#include <SoftPWM.h>
+#include <Servo.h> 
+#include <Stepper.h>
 
+
+/**
+ * GLOBALS AND HELPER FUNCTIONS
+ * 
+ */
 //UDP communication
 EthernetUDP Udp;
 
@@ -22,239 +30,295 @@ unsigned int outPort = 9999;
 byte mac[] = {  
   0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 
-//array of strings, one for each pin
+//array of char *s in OSC address form, one for each pin
 char pinString[54][4] = {
   "/0" ,"/1" ,"/2" ,"/3" ,"/4" ,"/5" ,"/6" ,"/7" ,"/8" ,"/9" ,"/10" ,"/11" ,"/12" ,"/13" ,"/14" ,"/15" ,"/16" ,"/17" ,"/18" ,"/19" ,"/20" ,"/21" ,"/22" ,"/23" ,"/24" ,"/25" ,"/26" ,"/27" ,"/28" ,"/29" ,"/30" ,"/31" ,"/32" ,"/33" ,"/34" ,"/35" ,"/36" ,"/37" ,"/38" ,"/39" ,"/40" ,"/41" ,"/42" ,"/43" ,"/44" ,"/45" ,"/46" ,"/47" ,"/48" ,"/49" ,"/50" ,"/51" ,"/52" ,"/53"};
 
-//some abstractions and helper functions taken from Oscuino 1.0 by Adrian Freed
-inline void digitalPullup(uint8_t pin, boolean b) { 
-  pinMode(pin, INPUT); 
-  digitalWrite(pin, b?HIGH:LOW); 
+//converts the pin to an osc address
+char * numToOSCAddress(int pin){
+  return pinString[pin];
 }
 
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
-#define ANALOG_PINS 16
-const int DIGITAL_PINS=54;
-inline void analogPullup(uint8_t pin, boolean b) { 
-  digitalPullup(pin+54,b); 
-}
-inline void analogOutWrite(uint8_t pin, uint8_t b) {
-  pinMode(pin+54, OUTPUT);  
-  digitalWrite(pin+54,b);
-}
 
-#else
-// teensy++
-#if defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__)
-
-#define ANALOG_PINS 8
-const int DIGITAL_PINS=38;
-inline void analogPullup(uint8_t pin, boolean b) { 
-  pinMode(38+pin,b?INPUT_PULLUP: INPUT); 
-}
-inline void analogOutWrite(uint8_t pin, uint8_t b) {
-  pinMode(38+pin, OUTPUT);  // change directions of an analog pin
-  digitalWrite(38+pin,b); 
-}
-
-#else
-//AT90USB1286 teensy++
-#if defined(__AVR_ATmega32U4__)
-//teensy 2.0
-#define ANALOG_PINS 12
-const int DIGITAL_PINS=11; // actually the teensy 2.0 has two more non contiguously addressed (22 and 23)
-inline void analogPullup(uint8_t pin, boolean b) { 
-  if(pin==11)
-    pin = -1; // ouch read the diagram carefully! http://www.pjrc.com/teensy/pinout.html
-  pinMode(21-pin,b?INPUT_PULLUP: INPUT); 
-}
-typedef enum {
-  endOfpinlist=-1, a0=14,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a14,a15 } 
-pinnames;
-inline void analogOutWrite(uint8_t pin, uint8_t b) {
-  if(pin==11)
-    pin = -1; // ouch
-  pinMode(21-pin, OUTPUT);  // change directions of an analog pin
-  digitalWrite(21-pin,b); 
-}
-
-#else
-//6 or 8 depending
-#define ANALOG_PINS 8
-const int DIGITAL_PINS=13;
-inline void analogPullup(uint8_t pin, boolean b) { 
-  digitalPullup(pin+14,b?HIGH:LOW); 
-}
-
-inline void analogOutWrite(uint8_t pin, uint8_t b) {
-  pinMode(pin+14, OUTPUT);  // change directions of an analog pin
-  digitalWrite(pin+14,b); 
-}
-#endif
-#endif
-#endif
-
-float getSupplyVoltage(){
-#if !defined(__AVR_ATmega8__)
-  // temperature and power supply measurement on some Arduinos 
-  // powersupply
-  int result;
-  // Read 1.1V reference against AVcc
-#if defined(__AVR_ATmega32U4__)
-  ADMUX = 0x40 | _BV(MUX4)| _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-  ADCSRB =  0;
-  //  ADCSRB = DEFAULT_ADCSRB | (1<<MUX5);
-#elif  defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__)    || defined(__AVR_ATmega1280__) 
-  ADMUX = 0x40| _BV(MUX4) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1) ;
-  ADCSRB =  0;
-#else
-  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-#endif
-  delayMicroseconds(300); // wait for Vref to settle
-  ADCSRA |= _BV(ADSC); // Convert
-  while (bit_is_set(ADCSRA,ADSC));
-  result = ADCL;
-  result |= ADCH<<8;
-
-
-  float supplyvoltage = 1.1264 *1023 / result;
-  return supplyvoltage;
-#endif  
-}
-
-float getTemperature(){
-
-  int result;
-#if defined(__AVR_ATmega32U4__) ||    (!defined(__AVR_ATmega1280__) && !defined(__AVR_ATmega8__) && !defined(__AVR_AT90USB646__) && !defined(__AVR_AT90USB1286__))
-  // temperature
-
-#if defined(__AVR_ATmega32U4__)
-  ADMUX =  _BV(REFS1) | _BV(REFS0) | _BV(MUX2) | _BV(MUX1) | _BV(MUX0);
-  ADCSRB =  _BV(MUX5);
-#else
-  ADMUX = _BV(REFS1) | _BV(REFS0) | _BV(MUX3);
-#endif
-
-
-  delayMicroseconds(200); // wait for Vref to settle
-  ADCSRA |= _BV(ADSC); // Convert
-  while (bit_is_set(ADCSRA,ADSC));
-  result = ADCL;
-  result |= ADCH<<8;
-
-  float temp = result/1023.0;
-  return temp;
-  analogReference(DEFAULT);
-#endif	
-}
-
-/*
-ANALOG
+/**
+ * ROUTES
+ * 
+ * these are where the routing functions go
+ * 
  */
 
-//called when the address pattern matches "/a"
-void handleAnalog(OSCMessage msg, int addrOffset ){
-  //iterate through all the analog pins
-  for(byte pin = 0; pin < ANALOG_PINS; pin++){
-    //match against the pin number strings
-    if(msg.fullMatch(pinString[pin], addrOffset)){
-      //reset the message in case its a pattern being matched mutliple times
-      msg.reset();
-      //if it has an value then it's an output with that value
-      if (msg.isInt()){
-        analogOutWrite(pin, msg.getInt()); 
-      } 
-      else { 
-        boolean pullup = false;
-        if (msg.isString()){
-          //if the data is the string 'u' then do an analog read with the pullup on
-          char strBuff[4];
-          msg.getString(strBuff);
-          pullup = (strcmp(strBuff,"u")==0);
-        } 
-        //send the analogRead
-        char outputAddr[6] = "/a/xx";
-        //put the pin num in the output address
-        outputAddr[3] = pinString[pin][1];
-        outputAddr[4] = pinString[pin][2];
-        //set the pullup
-        analogPullup(pin, pullup);
-        bundleOUT.addMessage(outputAddr).add(analogRead(pin));       
-      }
-    }
-  }
-}
-
-/*
-DIGITAL
+/**
+ * DIGITAL
+ * 
+ * called when address matched "/d"
+ * expected format:
+ * /d/(pin)
+ *   /u = digitalRead with pullup
+ *   (no value) = digitalRead without pullup
+ *   (value) = digital write on that pin
+ * 
  */
 
-void handleDigital(OSCMessage msg, int addrOffset ){
+void routeDigital(OSCMessage msg, int addrOffset ){
   //match input or output
-  for(byte pin = 0; pin < DIGITAL_PINS; pin++){
+  for(byte pin = 0; pin < NUM_DIGITAL_PINS; pin++){
     //match against the pin number strings
-    if(msg.fullMatch(pinString[pin], addrOffset)){
+    int pinMatched = msg.match(numToOSCAddress(pin), addrOffset);
+    if(pinMatched){
       //reset the message in case its a pattern being matched mutliple times
       msg.reset();
-      //if it has an value then it's an output with that value
+      //if it has an int, then it's a digital write
       if (msg.isInt()){
         pinMode(pin, OUTPUT);
-        digitalWrite(pin, msg.getInt()); 
-      } 
-      else { 
-        boolean pullup = false;
-        if (msg.isString()){
-          //if the data is the string 'u' then do a read with the pullup on
-          char strBuff[4];
-          msg.getString(strBuff);
-          pullup = (strcmp(strBuff,"u")==0);
-        } 
-        //send the digitalRead
-        char outputAddr[6] = "/d/xx";
-        //put the pin num in the output address
-        outputAddr[3] = pinString[pin][1];
-        outputAddr[4] = pinString[pin][2];
+        digitalWrite(pin, msg.getInt());
+      } //otherwise it's an analog read
+      //with a pullup?
+      else if (msg.fullMatch("/u", pinMatched+addrOffset)){
         //set the pullup
-        digitalPullup(pin, pullup);
-        bundleOUT.addMessage(outputAddr).add(digitalRead(pin));
+        pinMode(pin, INPUT_PULLUP);
+        //setup the output address which should be /d/(pin)/u
+        char outputAddress[9];
+        strcpy(outputAddress, "/d");
+        strcat(outputAddress, numToOSCAddress(pin));
+        strcat(outputAddress,"/u");
+        //do the analog read and send the results
+        bundleOUT.addMessage(outputAddress).add(digitalRead(pin));       
+      } //else without a pullup   
+      else {
+        //set the pinmode
+        pinMode(pin, INPUT);
+        //setup the output address which should be /d/(pin)
+        char outputAddress[6];
+        strcpy(outputAddress, "/d");
+        strcat(outputAddress, numToOSCAddress(pin));
+        //do the analog read and send the results
+        bundleOUT.addMessage(outputAddress).add(digitalRead(pin));         
       }
     }
   }
 }
 
-/*
- SYSTEM MESSAGES
- */
+/**
+ * ANALOG
+ * 
+ * called when the address matches "/a"
+ * 
+ * format:
+ * /a/(pin)
+ *   /u = analogRead with pullup
+ *   (no value) = analogRead without pullup
+ *   (value) = digital write on that pin
+ * 
+ **/
 
-void handleSystem(OSCMessage msg, int addrOffset ){
-  if (msg.fullMatch("/t", addrOffset)){
-    bundleOUT.addMessage("/s/t").add(getTemperature());
-  }
-  if (msg.fullMatch("/p", addrOffset)){
-    bundleOUT.addMessage("/s/p").add(getSupplyVoltage());
-  }
-  if (msg.fullMatch("/m", addrOffset)){
-    bundleOUT.addMessage("/s/m").add(long(micros()));
-
-  }
-  if (msg.fullMatch("/d", addrOffset)){
-    bundleOUT.addMessage("/s/d").add(DIGITAL_PINS);
-
-  }
-  if (msg.fullMatch("/a", addrOffset)){
-    bundleOUT.addMessage("/s/a").add(ANALOG_PINS);
+void routeAnalog(OSCMessage msg, int addrOffset ){
+  //iterate through all the analog pins
+  for(byte pin = 0; pin < NUM_ANALOG_INPUTS; pin++){
+    //match against the pin number strings
+    int pinMatched = msg.match(numToOSCAddress(pin), addrOffset);
+    if(pinMatched){
+      //reset the message in case its a pattern being matched mutliple times
+      msg.reset();
+      //if it has an int, then it's a digital write
+      if (msg.isInt()){
+        pinMode(analogInputToDigitalPin(pin), OUTPUT);
+        digitalWrite(analogInputToDigitalPin(pin), msg.getInt());
+      } //otherwise it's an analog read
+      //with a pullup?
+      else if (msg.fullMatch("/u", pinMatched+addrOffset)){
+        //set the pullup
+        pinMode(analogInputToDigitalPin(pin), INPUT);
+        digitalWrite(analogInputToDigitalPin(pin), HIGH);
+        //setup the output address which should be /a/(pin)/u
+        char outputAddress[9];
+        strcpy(outputAddress, "/a");
+        strcat(outputAddress, numToOSCAddress(pin));
+        strcat(outputAddress,"/u");
+        //do the analog read and send the results
+        bundleOUT.addMessage(outputAddress).add(analogRead(pin));       
+      } //else without a pullup   
+      else {
+        //set the pinmode
+        pinMode(analogInputToDigitalPin(pin), INPUT);
+        //setup the output address which should be /a/(pin)
+        char outputAddress[6];
+        strcpy(outputAddress, "/a");
+        strcat(outputAddress, numToOSCAddress(pin));
+        //do the analog read and send the results
+        bundleOUT.addMessage(outputAddress).add(analogRead(pin));         
+      }
+    }
   }
 }
 
-
-/*
-  MAIN METHODS
+/**
+ * PWM
+ * 
+ * called when address matched "/p"
+ * expected format:
+ * /p/(pin)
+ *     (value) = analogWrite with that value
+ *     /e = end the SoftPWM
  */
- 
+
+void routePWM(OSCMessage msg, int addrOffset ){
+  //iterate over all the pins
+  for(byte pin = 0; pin < NUM_DIGITAL_PINS; pin++){
+    //match against the pin number strings
+    int pinMatched = msg.match(numToOSCAddress(pin), addrOffset);
+    if(pinMatched){
+      //reset the message in case its a pattern being matched mutliple times
+      msg.reset();
+      //test if that pin is a PWM
+      if (digitalPinHasPWM(pin)){
+        //if it is, then analog write
+        if (msg.isInt()){
+          pinMode(pin, OUTPUT);
+          analogWrite(pin, msg.getInt());
+        } 
+      } //if not, do a software pwm
+      else {
+        //test if it is a command to end the software pwm
+        if (msg.fullMatch("/e", pinMatched+addrOffset)){
+          //set it to 0 first 
+          //(this seems to keep it from turning back on)
+          SoftPWMSet(pin, 0);
+          //then remove the timer from the pin
+          SoftPWMEnd(pin);
+        } //otherwise it's a softpwm write command
+        else if (msg.isInt()){
+          SoftPWMSet(pin, msg.getInt());
+        } 
+      }
+    }
+  }
+}
+
+/**
+ * SERVO
+ * 
+ * called when address matched "/v"
+ * expected format:
+ * /v/(servo)
+ *     (value) = write that value
+ *     /a (pin) = attach the servo to a pin
+ *     /e = detach the servo from the pin
+ */
+
+//this is the number of servos
+#define NUM_SERVOS 8
+
+Servo servo1;
+Servo servo2;
+Servo servo3;
+Servo servo4;
+Servo servo5;
+Servo servo6;
+Servo servo7;
+Servo servo8;
+Servo servos[] = {
+  servo1, servo2, servo3, servo4, servo5, servo6, servo7, servo8};
+
+void routeServo(OSCMessage msg, int addrOffset ){
+  //iterate over all the pins
+  for(byte s = 0; s < NUM_SERVOS; s++){
+    int servoMatched = msg.match(numToOSCAddress(s), addrOffset);
+    if(servoMatched){
+      //reset the message in case its a pattern being matched mutliple times
+      msg.reset();
+      //the servo being referenced:
+      Servo servo = servos[s];
+      //if it matches "/e" - detach the servo from the pin
+      if (msg.fullMatch("/e", servoMatched+addrOffset)){
+        //if it's attached, detach it
+        if (servo.attached()){
+          servo.detach();
+        }
+      } //if it matches "/a" - attach the servo to the pin
+      else if (msg.fullMatch("/a", servoMatched+addrOffset)){
+        if (msg.isInt()){
+          servo.attach(msg.getInt()); 
+        }
+      } //if it didn't match either of those, it's a servo write
+      else if (msg.isInt()){
+        if (msg.isInt()){
+          servo.write(msg.getInt()); 
+        }
+      }
+    }
+  }
+}
+
+/**
+ * STEPPER
+ * 
+ * called when address matched "/t"
+ * expected format:
+ * /t
+ *    (value) = step to that value
+ *    /s (value) = set the speed
+ * 
+ * change the pin numbers and the STEPPER definition to enable the stepper
+ * the stepper is precompiled out so that it doesn't clobber the pins that it's
+ * attached to since there is no way to detach the stepper from the pins
+ */
+
+#define STEPPER_ENABLED 0
+
+#if STEPPER_ENABLED
+
+//the stepper object
+Stepper stepper = Stepper(100, 4, 5);
+
+void routeStepper(OSCMessage msg, int addrOffset ){
+  //set the speed if the next part of the address matches "/s"
+  if (msg.fullMatch("/s", addrOffset)){
+    if (msg.isInt()){
+      stepper.setSpeed(msg.getInt()); 
+    }
+  } //otherwise it's a step command 
+  else {
+    if (msg.isInt()){
+      stepper.step(msg.getInt()); 
+    }
+  }
+}
+#endif
+
+/**
+ * SYSTEM MESSAGES
+ * 
+ * expected format:
+ * /s
+ *   /m = microseconds
+ *   /d = number of digital pins
+ *   /a = number of analog pins
+ */
+
+void routeSystem(OSCMessage msg, int addrOffset ){
+  if (msg.fullMatch("/m", addrOffset)){
+    bundleOUT.addMessage("/s/m").add(long(micros()));
+  }
+  if (msg.fullMatch("/d", addrOffset)){
+    bundleOUT.addMessage("/s/d").add(NUM_DIGITAL_PINS);
+  }
+  if (msg.fullMatch("/a", addrOffset)){
+    bundleOUT.addMessage("/s/a").add(NUM_ANALOG_INPUTS);
+  }
+}
+
+/**
+ * MAIN METHODS
+ * 
+ * setup and loop, bundle receiving/sending, initial routing
+ */
+
 void setup() {
   //setup ethernet part
   Ethernet.begin(mac,ip);
   Udp.begin(inPort);
+  //start software PWM
+  SoftPWMBegin();
 }
 
 void loop(){
@@ -264,21 +328,27 @@ void loop(){
   bundleReceive();
 }
 
+//reads and routes the incoming messages
 void bundleReceive(){ 
   int packetSize = Udp.parsePacket();
   if(packetSize){
-    Serial.println(packetSize);
     if (bundleIN.receive()>0){
-     bundleIN.route("/a", handleAnalog);
-     sendBundle();
-     bundleIN.route("/d", handleDigital);
-     sendBundle();
-     bundleIN.route("/s", handleSystem);
-     sendBundle();
+      bundleIN.route("/a", routeAnalog);
+      sendBundle();
+      bundleIN.route("/d", routeDigital);
+      sendBundle();
+      bundleIN.route("/p", routePWM);
+      bundleIN.route("/v", routeServo);
+      bundleIN.route("/s", routeSystem);
+      sendBundle();
+#if STEPPER_ENABLED
+      bundleIN.route("/t", routeStepper);
+#endif
     }
   }
 }
 
+//outputs the output bundle
 void sendBundle(){
   //send the outgoing message
   if(bundleOUT.size()){
@@ -287,5 +357,6 @@ void sendBundle(){
     Udp.endPacket();
   } 
 }
+
 
 
