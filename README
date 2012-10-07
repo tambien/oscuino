@@ -44,8 +44,6 @@ PWM can be called on all pins with an automatic fallback to software PWM using t
 	/e = ends the SoftPWM on that pin
 	/h = returns 0/1 if the pin has hardware PWM. 
 
-
-
 example:
 "/p/0 128" sets the PWM on pin 0
 "/p/0/h" returns 1 if pin 0 has hardware PWM
@@ -98,15 +96,13 @@ void loop(){
 
 
 ////////////////////////////////////////////////////////////////////////
-
 SLIPSerial
 
 The source also includes an extension of the Serial object which sends and receives data using the SLIP encoding (you can read more about that here http://www.cse.iitb.ac.in/~bestin/btech-proj/slip/x365.html). This makes Max/MSP integration very simple using CNMAT's slipOSC object connected to the Serial object. The SLIPSerial object has the same methods as the Serial object except for an additional "endTransmission" method which transmits the "End Of Transmission" character (octal 300) which is the message delimiter for the SLIP encoding. 
 
 ////////////////////////////////////////////////////////////////////////
-
 Installation
 
-Place the contents of the "src" folder into a file titled "libraries" inside of your Arduino Sketch search path. After restarting the Arduino IDE, those libraries should be visible under the menu Sketch->Import Library. 
+Place the contents of the "library" folder into a file titled "libraries" inside of your Arduino Sketch search path. After restarting the Arduino IDE, those libraries should be visible under the menu Sketch->Import Library. 
 
 For the Max/MSP examples to work, you'll need to download the odot objects available at http://cnmat.berkeley.edu/downloads/odot (sorry Mac only right now) and the CNMAT Everything download http://cnmat.berkeley.edu/downloads
