@@ -48,7 +48,7 @@ PWM can be called on all pins with an automatic fallback to software PWM using t
 
 example:
 "/p/0 128" sets the PWM on pin 0
-"/d/0/h" returns 1 if pin 0 has hardware PWM
+"/p/0/h" returns 1 if pin 0 has hardware PWM
 
 SERVO
 Arduino supports up to 8 servos. Attach the servo to a specific pin and detach the servo if you want to use that pin for something else. This uses Arduino's Servo library. 
