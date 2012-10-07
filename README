@@ -77,8 +77,7 @@ GETTING STARTED
 OSCuino is composed of two classes: oMESSAGE and oBUNDLE. oMESSAGE contains the address, type, and data and oBUNDLE is a bundle of oMESSAGEs with a timetag. To start sending data over the Arduino’s Serial port simply construct an oBUNDLE with Serial as the constructor argument, add some oMESSAGEs with some data, and send it off:
 
 
-#include <oMESSAGE.h>
-#include <oBUNDLE.h>
+#include <OSCBundle.h>
 #include <SLIPEncodedSerial.h>
 
 void setup(){
