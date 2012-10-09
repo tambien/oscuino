@@ -6,7 +6,6 @@ Features:
 - Send and receive messages over any transport layer that implements the Arduino’s Stream - Class such as Serial, EthernetUdp, MIDI, and more.
 - Address pattern matching
 - Static memory consumption
-- Compatible with Arduino 1.0 API and coding style
 - 64-bit timetags
 
 ////////////////////////////////////////////////////////////////////////
@@ -102,6 +101,6 @@ The source also includes an extension of the Serial object which sends and recei
 ////////////////////////////////////////////////////////////////////////
 Installation
 
-Place the contents of the "library" folder into a file titled "libraries" inside of your Arduino Sketch search path. After restarting the Arduino IDE, those libraries should be visible under the menu Sketch->Import Library. 
+Make sure you're using Arduino 1.0.1 or greater. Place the contents of the "library" folder into a file titled "libraries" inside of your Arduino Sketch search path. After restarting the Arduino IDE, those libraries should be visible under the menu Sketch->Import Library. 
 
 For the Max/MSP examples to work, you'll need to download the odot objects available at http://cnmat.berkeley.edu/downloads/odot (sorry Mac only right now) and the CNMAT Everything download http://cnmat.berkeley.edu/downloads
