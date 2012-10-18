@@ -23,6 +23,26 @@ char * numToOSCAddress(int pin){
   return pinString[pin];
 }
 
+/**
+ * LIGHT SHOW
+ * a simple blinking pattern to show that oscuino is installed on this microcontroller
+ */
+
+void lightShow(){
+  //if it says that LED_BUILTIN is not defined when compiling:
+  //comment out the contents of this function. 
+  digitalWrite(LED_BUILTIN, 1);
+  delay(100);
+  digitalWrite(LED_BUILTIN, 0);
+  delay(300);
+  digitalWrite(LED_BUILTIN, 1);
+  delay(100);
+  digitalWrite(LED_BUILTIN, 0);
+  delay(100);
+  digitalWrite(LED_BUILTIN, 1);
+  delay(100);
+  digitalWrite(LED_BUILTIN, 0);
+}
 
 /**
  * ROUTES
@@ -153,9 +173,9 @@ void routePWM(OSCMessage msg, int addrOffset ){
     if(pinMatched){
       //reset the message in case its a pattern being matched mutliple times
       msg.reset();
-       //tests if the pin is hardware PWM
+      //tests if the pin is hardware PWM
       if (msg.fullMatch("/h", addrOffset+pinMatched)){
-         char outputAddress[9];
+        char outputAddress[9];
         strcpy(outputAddress, "/p");
         strcat(outputAddress, numToOSCAddress(pin));
         strcat(outputAddress,"/h");
@@ -262,10 +282,21 @@ void routeServo(OSCMessage msg, int addrOffset ){
 #define STEPPER_PIN0 4
 #define STEPPER_PIN1 5
 
+/* uncomment these out if your stepper requires 4 pins 
+#define STEPPER_PIN2 6
+#define STEPPER_PIN3 7
+*/
+
 #if STEPPER_ENABLED
 
 //the stepper object
+//this is the 4 pin version
+#ifdef STEPPER_PIN2
+Stepper stepper = Stepper(100, STEPPER_PIN0, STEPPER_PIN1, STEPPER_PIN2, STEPPER_PIN3);
+#else
+//the two pin version
 Stepper stepper = Stepper(100, STEPPER_PIN0, STEPPER_PIN1);
+#endif
 
 void routeStepper(OSCMessage msg, int addrOffset ){
   //set the speed if the next part of the address matches "/s"
@@ -314,6 +345,8 @@ void setup() {
   SLIPSerial.begin(115200);
   //start software PWM
   SoftPWMBegin();
+  //do the lightshow
+  lightShow();
 }
 
 void loop(){
@@ -351,3 +384,7 @@ void sendBundle(){
 #endif
   } 
 }
+
+
+
+
