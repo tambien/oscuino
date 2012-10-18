@@ -56,7 +56,7 @@ Arduino supports up to 8 servos. Attach the servo to a specific pin and detach t
  	/e = detach the servo from the pin 
 
 example:
-"/v/1 1" attach servo 1 to pin 1.
+"/v/1/a 1" attach servo 1 to pin 1.
 "/v/1 90" moves servo 1 to 90 degrees
 
 STEPPER
