@@ -36,7 +36,7 @@ example:
 "/d/[0-4] 0" performs digitalWrite LOW on pins 0 through 4.
 
 PWM
-PWM can be called on all pins with an automatic fallback to software PWM using the SoftPWM library on pins that don't support hardware PWM. Software PWM needs to be turned off if you want to use that pin for anything else, otherwise it will continue to update the pin.
+PWM can be called on all pins with an automatic fallback to software PWM using the SoftPWM library on pins that don't support hardware PWM. Software PWM needs to be turned off if you want to use that pin for anything else, otherwise it will continue to update the pin. The maximum number of simultaneous SoftPWMs is 20. 
 
 /p/(pin #)
 	(value 0-255) = analogWrite with that value
