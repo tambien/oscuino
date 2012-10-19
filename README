@@ -60,15 +60,18 @@ example:
 "/v/1 90" moves servo 1 to 90 degrees
 
 STEPPER
-The stepper is by default disabled. Change STEPPER_ENABLED to 1 in the sketch to enable it and select the pins that you want the stepper to use. This uses Arduino's Stepper library. 
+There are four stepper motors available. Attach the stepper you want to some pins before using it. This uses Arduino's Stepper library. 
 
-/t
+/t/(stepper # 0-3)
 	(value) = step to that value
 	/s = set the stepper speed
+	/a = setup the stepper with number of steps and pins you want to use.
 
 example:
-"/t 20" steps 20 steps. 
-"/t 50" sets the stepper speed to 50 rpm. 
+"/t/0/a 100 2 3" attach stepper 0 with 100 steps to pins 2 and 3 (same as calling stepper = Stepper (100, 2, 3);)
+"/t/1/a 100 2 3 4 5" attach stepper 0 with 100 steps to pins 2, 3, 4, 5 (same as calling stepper = Stepper (100, 2, 3, 4, 5);)
+"/t/1 10" moves stepper 1 10 steps
+"/t/0/s 50" sets the speed of stepper 0 to 50 rpm
 
 ////////////////////////////////////////////////////////////////////////
 GETTING STARTED

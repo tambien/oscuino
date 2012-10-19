@@ -267,51 +267,63 @@ void routeServo(OSCMessage msg, int addrOffset ){
  * 
  * called when address matched "/t"
  * expected format:
- * /t
+ * /t/[stepper]
  *    (value) = step to that value
  *    /s (value) = set the speed
  * 
- * change the pin numbers and the STEPPER definition to enable the stepper
- * the stepper is precompiled out so that it doesn't clobber the pins that it's
- * attached to since there is no way to detach the stepper from the pins
+ * there are four stepper motors available. assign their pins before using them
  */
 
-//change to 1 to enable the stepper
-#define STEPPER_ENABLED 0
-//change the pins to the pins you want to use
-#define STEPPER_PIN0 4
-#define STEPPER_PIN1 5
+#define NUM_STEPPERS 4
 
-/* uncomment these out if your stepper requires 4 pins 
-#define STEPPER_PIN2 6
-#define STEPPER_PIN3 7
-*/
-
-#if STEPPER_ENABLED
-
-//the stepper object
-//this is the 4 pin version
-#ifdef STEPPER_PIN2
-Stepper stepper = Stepper(100, STEPPER_PIN0, STEPPER_PIN1, STEPPER_PIN2, STEPPER_PIN3);
-#else
-//the two pin version
-Stepper stepper = Stepper(100, STEPPER_PIN0, STEPPER_PIN1);
-#endif
+Stepper stepper0 = Stepper(100, 0, 1);
+Stepper stepper1 = Stepper(100, 0, 1);
+Stepper stepper2 = Stepper(100, 0, 1);
+Stepper stepper3 = Stepper(100, 0, 1);
+Stepper stepperArray[] = {
+  stepper0, stepper1, stepper2, stepper3};
 
 void routeStepper(OSCMessage msg, int addrOffset ){
-  //set the speed if the next part of the address matches "/s"
-  if (msg.fullMatch("/s", addrOffset)){
-    if (msg.isInt()){
-      stepper.setSpeed(msg.getInt()); 
-    }
-  } //otherwise it's a step command 
-  else {
-    if (msg.isInt()){
-      stepper.step(msg.getInt()); 
+  for(byte s = 0; s < NUM_STEPPERS; s++){
+    int stepperMatched = msg.match(numToOSCAddress(s), addrOffset);
+    if(stepperMatched){
+      msg.reset();
+      //the matched stepper
+      Stepper stepper = stepperArray[s];
+      if (msg.fullMatch("/a", stepperMatched+addrOffset)){
+        if (msg.size()==5){
+          int steps = msg.getInt();
+          int pin1 = msg.getInt();
+          int pin2 = msg.getInt();
+          int pin3 = msg.getInt();
+          int pin4 = msg.getInt();
+          stepper = Stepper(steps, pin1, pin2, pin3, pin4);
+          //place it in the stepper Array
+          stepperArray[s] = stepper;
+        } 
+        else if (msg.size()==3){
+          int steps = msg.getInt();
+          int pin1 = msg.getInt();
+          int pin2 = msg.getInt();
+          stepper = Stepper(steps, pin1, pin2);
+          stepperArray[s] = stepper;
+        }
+      } 
+      else if (msg.fullMatch("/s", stepperMatched+addrOffset)){
+        if (msg.isInt()){
+          stepper.setSpeed(msg.getInt()); 
+        }
+      }
+      //if it didn't match either of those, it's a stepper write
+      else if (msg.isInt()){
+        if (msg.isInt()){
+          stepper.step(msg.getInt()); 
+        }
+      }
+
     }
   }
 }
-#endif
 
 /**
  * SYSTEM MESSAGES
@@ -384,6 +396,10 @@ void sendBundle(){
 #endif
   } 
 }
+
+
+
+
 
 
 
