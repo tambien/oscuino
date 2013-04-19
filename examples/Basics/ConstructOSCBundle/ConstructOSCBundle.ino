@@ -20,7 +20,7 @@ void loop(){
   //'addMessage' defaults to one datum in the data feild.
   // an additional argument indicates how much data will go in the message
   bndl.add("/pinModes").add("INPUT").add("OUTPUT").add("PULLUP");
-  //bndl.send(SLIPSerial);
-  //SLIPSerial.endTransmission();
+  bndl.send(SLIPSerial);
+  SLIPSerial.endTransmission();
   delay(1000);
 }

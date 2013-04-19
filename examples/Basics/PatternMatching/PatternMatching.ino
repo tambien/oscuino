@@ -24,7 +24,7 @@ OSC Regular expression pattern matching rules from http://opensoundcontrol.org/s
  ///////////////////////////////////////////////////////////////////////////////////////////////////
  */
 
-#include <OSCMessage.h>
+#include <OSCBundle.h>
 
 void setup() {
   Serial.begin(38400);
