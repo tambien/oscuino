@@ -1,27 +1,17 @@
-
-
-#include <SPI.h>        
-#include <Ethernet.h>
-#include <EthernetUdp.h>
 #include <OSCBundle.h>
 #include <OSCMessage.h>
 
-
 /*
-  this example is meant to be used with the oscuinoTouchOSC layout for touchOSC
+  This example is meant to be used with the MAX/MSP 
+  to Arduino Interface called oscuinoSerial.maxpatch
+  
   */
 
-EthernetUDP Udp;
 
-OSCBundle bundle(Udp);
-OSCBundle bundleOUT(Udp);
+#include <SLIPEncodedSerial.h>
 
-IPAddress ip(192,168,1,120);
-IPAddress gateway(128 , 32 , 122 , 254);
-IPAddress subnet(255 , 255 , 255 , 0);
-
-unsigned int inPort = 8888;
-unsigned int outPort = 9999;
+OSCBundle bundle(SLIPSerial);
+OSCBundle bundleOUT(SLIPSerial);
 
 
 //many definitions and abstractions are taken from OSCuino 1.0 by Adrian Freed 2011
@@ -142,7 +132,7 @@ inline void digitalPullup(uint8_t pin, boolean b) {
 	digitalWrite(pin, b?HIGH:LOW); 
 }
 
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+#if defined(__AVR_ATmega1280__)
 #define ANALOG_PINS 16
 const int DIGITAL_PINS=54;
 inline void analogPullup(uint8_t pin, boolean b) { 
@@ -151,6 +141,11 @@ inline void analogPullup(uint8_t pin, boolean b) {
 inline void analogOutWrite(uint8_t pin, uint8_t b) {
 	pinMode(pin+54, OUTPUT);  
 	digitalWrite(pin+54,b);
+}
+
+inline void analogPWMWrite(uint8_t pin, uint8_t b) {
+	pinMode(pin+54, OUTPUT);  
+	analogWrite(pin+54,b);
 }
 
 #else
@@ -167,6 +162,10 @@ inline void analogOutWrite(uint8_t pin, uint8_t b) {
 	digitalWrite(38+pin,b); 
 }
 
+inline void analogPWMWrite(uint8_t pin, uint8_t b) {
+	pinMode(38+pin, OUTPUT);  // change directions of an analog pin
+	analogWrite(38+pin,b); 
+}
 #else
 //AT90USB1286 teensy++
 #if defined(__AVR_ATmega32U4__)
@@ -187,7 +186,12 @@ inline void analogOutWrite(uint8_t pin, uint8_t b) {
 	pinMode(21-pin, OUTPUT);  // change directions of an analog pin
 	digitalWrite(21-pin,b); 
 }
-
+inline void analogPWMWrite(uint8_t pin, uint8_t b) {
+	if(pin==11)
+		pin = -1; // ouch
+	pinMode(21-pin, OUTPUT);  // change directions of an analog pin
+	analogWrite(21-pin,b); 
+}
 #else
 //6 or 8 depending
 #define ANALOG_PINS 8
@@ -197,8 +201,14 @@ inline void analogPullup(uint8_t pin, boolean b) {
 }
 
 inline void analogOutWrite(uint8_t pin, uint8_t b) {
+	
 	pinMode(pin+14, OUTPUT);  // change directions of an analog pin
 	digitalWrite(pin+14,b); 
+}
+inline void analogPWMWrite(uint8_t pin, uint8_t b) {
+	
+	pinMode(pin+14, OUTPUT);  // change directions of an analog pin
+	analogWrite(pin+14,b); 
 }
 #endif
 #endif
@@ -214,7 +224,7 @@ float getSupplyVoltage(){
     ADMUX = 0x40 | _BV(MUX4)| _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
     ADCSRB =  0;
     //  ADCSRB = DEFAULT_ADCSRB | (1<<MUX5);
-#elif  defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__)    || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+#elif  defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__)    || defined(__AVR_ATmega1280__) 
     ADMUX = 0x40| _BV(MUX4) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1) ;
     ADCSRB =  0;
 #else
@@ -265,177 +275,354 @@ char pinString[54][4] = {"/0" ,"/1" ,"/2" ,"/3" ,"/4" ,"/5" ,"/6" ,"/7" ,"/8" ,"
 /*
   The main part of the program. 
 */
-byte mac[] = {  
-  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 
 void setup() {
   //setup ethernet part
-  Serial.begin(38400);
-  Ethernet.begin(mac,ip);
-  Udp.begin(inPort);
+  SLIPSerial.begin(115200);
 }
 
-boolean analogPolling = true;
-boolean digitalPolling = false;
+boolean analogReadMode = false;
+boolean digitalReadMode = false;
+boolean analogPullupReadMode = false;
+boolean digitalPullupReadMode = false;
 
 void loop(){
   bundle.clear();  
   //read the incoming message
   bundleReceive();
-  polling();
-  sendBundle();
+  pollingMode();
 }
 
 
+
 void bundleReceive(){ 
-  int packetSize = Udp.parsePacket();
-  if(packetSize){
-    if (bundle.receive()>0){
-      // "/*"  = "/\052" 
+  if (bundle.receive()>0){
+     // "/*"  = "/\052" 
      //bc of a bug in the Arduino IDE, it won't compile with "/*" in a string.
+     //long tm1 = micros();
+     //long tm2 = micros();
+     //bundleOUT.addMessage("/t/a").add(tm2-tm1);
      bundle.route("/a", handleAnalog);
      sendBundle();
      bundle.route("/d", handleDigital);
      sendBundle();
-    }
+     bundle.route("/s", handleSystem);
+     sendBundle();
+     bundle.route("/m", handleMode);
   }
 }
 
 void sendBundle(){
   //send the outgoing message
   if(bundleOUT.size()){
-    Udp.beginPacket(Udp.remoteIP(), outPort);
-    //Udp.beginPacket(outIP, outPort);
     bundleOUT.send();
-    Udp.endPacket();
+    SLIPSerial.endTransmission(); 
+    #if defined(CORE_TEENSY)
+    Serial.send_now();
+    #endif
   } 
 }
 
 /*
-ANALOG METHOD
+ANALOG METHODS
 */
 
-boolean pullupState[16] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false};
+inline void addAnalogRead(char * address, int pin){
+  analogPullup(pin, false);
+  bundleOUT.addMessage(address).add(analogRead(pin));
+}
 
-void routeAnalogPullup(OSCMessage msg, int addrOffset ){
-   for(byte i = 0; i < ANALOG_PINS; i++){
-    //match against the pin numbers
-    if(msg.fullMatch(pinString[i], addrOffset)){
-      //reset the message in case its a pattern being matched mutliple times
-      msg.reset();
-      //if it has an value then it's an output with that value
-      if (msg.isFloat()){
-        int pullup = (int) msg.getFloat();
-        pullupState[i] = pullup;
-        analogPullup(i, pullup);
-      } 
-    }
+void routeAnalogRead(OSCMessage msg, int addrOffset){
+  for(byte i = 0; i < ANALOG_PINS; i++){
+    if(msg.match(pinString[i], addrOffset)){
+      //message is asking for an analog read
+      if (msg.isString()){
+        char addrBuff[16];
+        msg.getString(addrBuff);
+        addAnalogRead(addrBuff, i);
+      } else {
+        char outputAddr[8] = "/a/i/xx";
+        //put the pin num in the output address
+        outputAddr[5] = pinString[i][1];
+        outputAddr[6] = pinString[i][2];
+        addAnalogRead(outputAddr, i);
+      }
+    } 
   }
 }
 
-inline int doAnalogRead(int pin){
-   analogPullup(pin, pullupState[pin]); 
-   return analogRead(pin);
+inline void addAnalogPullupRead(char * address, int pin){
+  analogPullup(pin, true);
+  bundleOUT.addMessage(address).add(analogRead(pin));
+}
+
+void routeAnalogPullupRead(OSCMessage msg, int addrOffset){
+  for(byte i = 0; i < ANALOG_PINS; i++){
+    if(msg.match(pinString[i], addrOffset)){
+      //message is asking for an analog read
+      if (msg.isString()){
+        char addrBuff[16];
+        msg.getString(addrBuff);
+        addAnalogPullupRead(addrBuff, i);
+      } else {
+        char outputAddr[8] = "/a/u/xx";
+        //put the pin num in the output address
+        outputAddr[5] = pinString[i][1];
+        outputAddr[6] = pinString[i][2];
+        addAnalogPullupRead(outputAddr, i);
+      }
+    } 
+  }
+}
+
+void routeAnalogOut(OSCMessage msg, int addrOffset){
+  for(byte i = 0; i < ANALOG_PINS; i++){
+    if(msg.match(pinString[i], addrOffset)){
+      analogOutWrite(i, msg.getInt());
+    } 
+  }  
+}
+
+void routeAnalogPWM(OSCMessage msg, int addrOffset){
+  for(byte i = 0; i < ANALOG_PINS; i++){
+    if(msg.match(pinString[i], addrOffset)){
+      analogPWMWrite(i, msg.getInt());
+    } 
+  }  
 }
 
 void handleAnalog(OSCMessage msg, int addrOffset ){
-  //match analog pullup command
-  msg.route("/up", routeAnalogPullup, addrOffset);
+  msg.route("/i", routeAnalogRead, addrOffset);
+  msg.route("/u", routeAnalogPullupRead, addrOffset);
+  msg.route("/o", routeAnalogOut, addrOffset);
+  msg.route("/p", routeAnalogPWM, addrOffset);  
 }
 
 /*
 DIGITAL METHODS
 */
-void routeDigitalPullup(OSCMessage msg, int addrOffset ){
-   for(byte i = 0; i < DIGITAL_PINS; i++){
-    //match against the pin numbers
-    if(msg.fullMatch(pinString[i], addrOffset)){
-      //reset the message in case its a pattern being matched mutliple times
-      msg.reset();
-      //if it has an value then it's an output with that value
-      if (msg.isFloat()){
-        digitalPullup(i, (int) msg.getFloat()); 
-      } 
+inline void addDigitalRead(char * address, int pin){
+  digitalPullup(pin, false);
+  bundleOUT.addMessage(address).add(digitalRead(pin));
+}
+
+void routeDigitalRead(OSCMessage msg, int addrOffset){
+  for(byte i = 0; i < DIGITAL_PINS; i++){
+    if(msg.match(pinString[i], addrOffset)){
+      //message is asking for an analog read
+      if (msg.isString()){
+        char addrBuff[16];
+        msg.getString(addrBuff);
+        addDigitalRead(addrBuff, i);
+      } else {
+        char outputAddr[8] = "/d/i/xx";
+        //put the pin num in the output address
+        outputAddr[5] = pinString[i][1];
+        outputAddr[6] = pinString[i][2];
+        addDigitalRead(outputAddr, i);
+      }
+    } 
+  }
+}
+
+inline void addDigitalPullupRead(char * address, int pin){
+  digitalPullup(pin, true);
+  bundleOUT.addMessage(address).add(digitalRead(pin));
+}
+
+void routeDigitalPullupRead(OSCMessage msg, int addrOffset){
+  for(byte i = 0; i < DIGITAL_PINS; i++){
+    if(msg.match(pinString[i], addrOffset)){
+      //message is asking for an analog read
+      if (msg.isString()){
+        char addrBuff[16];
+        msg.getString(addrBuff);
+        addDigitalPullupRead(addrBuff, i);
+      } else {
+        char outputAddr[8] = "/d/u/xx";
+        //put the pin num in the output address
+        outputAddr[5] = pinString[i][1];
+        outputAddr[6] = pinString[i][2];
+        addDigitalPullupRead(outputAddr, i);
+      }
+    } 
+  }
+}
+
+void routeDigitalOut(OSCMessage msg, int addrOffset){
+  for(byte i = 0; i < DIGITAL_PINS; i++){
+    if(msg.match(pinString[i], addrOffset)){
+      pinMode(i, OUTPUT);
+      digitalWrite(i, msg.getInt());
+    } 
+  }  
+}
+
+void routeDigitalPWM(OSCMessage msg, int addrOffset){
+  for(byte i = 0; i < DIGITAL_PINS; i++){
+    if(msg.match(pinString[i], addrOffset)){
+      analogWrite(i, msg.getInt());
+    } 
+  }  
+}
+
+void handleDigital(OSCMessage msg, int addrOffset ){
+  msg.route("/i", routeDigitalRead, addrOffset);
+  msg.route("/u", routeDigitalPullupRead, addrOffset);
+  msg.route("/o", routeDigitalOut, addrOffset);  
+  msg.route("/p", routeDigitalPWM, addrOffset);  
+}
+
+/*
+ SYSTEM MESSAGES
+*/
+
+void handleSystem(OSCMessage msg, int addrOffset ){
+  /*
+  //handle the temp.
+  if (msg.fullMatch("/t", addrOffset)){
+    bundleOUT.addMessage("/s/t").add(getTemperature());
+  }*/
+  if (msg.fullMatch("/p", addrOffset)){
+    bundleOUT.addMessage("/s/p").add(getSupplyVoltage());
+  }
+  if (msg.fullMatch("/m", addrOffset)){
+    bundleOUT.addMessage("/s/m").add(long(micros()));
+     
+  }
+  if (msg.fullMatch("/d", addrOffset)){
+    bundleOUT.addMessage("/s/d").add(DIGITAL_PINS);
+     
+  }
+  if (msg.fullMatch("/a", addrOffset)){
+    bundleOUT.addMessage("/s/a").add(ANALOG_PINS);
+  }
+}
+
+/*
+ MODE MESSAGES
+*/
+
+void handleMode(OSCMessage msg, int addrOffset ){
+  msg.route("/u", handlePullupMode, addrOffset);
+  msg.route("/i", handleInputMode, addrOffset);
+}
+
+void handlePullupMode(OSCMessage msg, int addrOffset ){
+  if (msg.fullMatch("/a", addrOffset)){
+    if (msg.getInt()){
+      analogPullupReadMode = true;
+    } else {
+      analogPullupReadMode = false;
+    }
+  }
+  if (msg.fullMatch("/d", addrOffset)){
+    if (msg.getInt()){
+      digitalPullupReadMode = true;
+    } else {
+      digitalPullupReadMode = false;
     }
   }
 }
 
-inline int doDigitalRead(int pin){
-  pinMode(pin, INPUT);
-  return digitalRead(pin);
-}
-
-
-void handleDigital(OSCMessage msg, int addrOffset ){
-  //match input or output
-  for(byte i = 0; i < DIGITAL_PINS; i++){
-    //match against the pin numbers
-    if(msg.fullMatch(pinString[i], addrOffset)){
-      //reset the message in case its a pattern being matched mutliple times
-      msg.reset();
-      //if it has an value then it's an output with that value
-      if (msg.isFloat()){
-        pinMode(i, OUTPUT);
-        digitalWrite(i, (int) msg.getFloat()); 
-      } 
-    } 
-  }
-}
-
-
-/*
- POLLING MESSAGES
-*/
-
-void polling(){
-  if (analogPolling){
-    int msgCounter = 0;
-    for(byte i = 0; i < ANALOG_PINS; i++){
-      //otherwise just do an analog reading and send the value
-      char outputAddr[6] = "/a/xx";
-      //put the pin num in the output address
-      outputAddr[3] = pinString[i+1][1];
-      outputAddr[4] = pinString[i+1][2];
-      bundleOUT.addMessage(outputAddr).add(floatfrom10bitint(analogRead(i)));
-      msgCounter++;
-      if (msgCounter>12){
-        sendBundle();
-        msgCounter = 0; 
-      }
-    } 
-    sendBundle();
-  }
-  if (digitalPolling){
-    int msgCounter = 0;
-    for(byte i = 0; i < DIGITAL_PINS; i++){
-      //otherwise just do an analog reading and send the value
-      char outputAddr[6] = "/d/xx";
-      //put the pin num in the output address
-      outputAddr[3] = pinString[i][1];
-      outputAddr[4] = pinString[i][2];
-      bundleOUT.addMessage(outputAddr).add(doDigitalRead(i));
-      msgCounter++;
-      if (msgCounter>12){
-        sendBundle();
-        msgCounter = 0; 
-      }
-    } 
-  sendBundle();
-  }
-}
-
-void handlePolling(OSCMessage msg, int addrOffset ){
+void handleInputMode(OSCMessage msg, int addrOffset ){
   if (msg.fullMatch("/a", addrOffset)){
-    msg.reset();
-    if(msg.isInt()){
-      analogPolling = msg.getInt();
-    }  
+    if (msg.getInt()){
+      analogReadMode = true;
+    } else {
+      analogReadMode = false;
+    }
   }
   if (msg.fullMatch("/d", addrOffset)){
-    msg.reset();
-    if(msg.isInt()){
-      digitalPolling = msg.getInt();
-    }  
+    if (msg.getInt()){
+      digitalReadMode = true;
+    } else {
+      digitalReadMode = false;
+    }
   }
 }
+
+void doDigitalRead(){
+  int bundleSize = 0;
+  for(byte i = 0; i < DIGITAL_PINS; i++){
+    bundleSize++;
+    char outputAddr[8] = "/d/i/xx";
+    outputAddr[5] = pinString[i][1];
+    outputAddr[6] = pinString[i][2];
+    addDigitalRead(outputAddr, i);
+    //this ensures that the bundle won't be too big by splitting it up into multiple bundles
+    if (bundleSize>=12){
+      bundleSize=0;
+    }
+  } 
+}
+
+void doDigitalPullupRead(){
+  int bundleSize = 0;
+  for(byte i = 0; i < DIGITAL_PINS; i++){
+    bundleSize++;
+    char outputAddr[8] = "/d/u/xx";
+    outputAddr[5] = pinString[i][1];
+    outputAddr[6] = pinString[i][2];
+    addDigitalPullupRead(outputAddr, i);
+    //this ensures that the bundle won't be too big by splitting it up into multiple bundles
+    if (bundleSize>=12){
+      bundleSize=0;
+    }
+  } 
+}
+
+
+void doAnalogRead(){
+  int bundleSize = 0;
+  for(byte i = 0; i < ANALOG_PINS; i++){
+    bundleSize++;
+    char outputAddr[8] = "/a/i/xx";
+    outputAddr[5] = pinString[i][1];
+    outputAddr[6] = pinString[i][2];
+    addAnalogRead(outputAddr, i);
+    //this ensures that the bundle won't be too big by splitting it up into multiple bundles
+    if (bundleSize>=12){
+      bundleSize=0;
+      sendBundle();
+    }
+  } 
+}
+
+void doAnalogPullupRead(){
+  int bundleSize = 0;
+  for(byte i = 0; i < ANALOG_PINS; i++){
+    bundleSize++;
+    char outputAddr[8] = "/a/u/xx";
+    outputAddr[5] = pinString[i][1];
+    outputAddr[6] = pinString[i][2];
+    addAnalogPullupRead(outputAddr, i);
+    //this ensures that the bundle won't be too big by splitting it up into multiple bundles
+    if (bundleSize>=12){
+      bundleSize=0;
+    }
+  } 
+}
+
+void pollingMode(){
+  sendBundle();
+  if (analogReadMode){
+    doAnalogRead(); 
+    sendBundle();
+  }
+  if (digitalReadMode){
+    doDigitalRead();
+    sendBundle();
+  }
+  if (analogPullupReadMode){
+    doAnalogPullupRead(); 
+    sendBundle();
+  }
+  if (digitalPullupReadMode){
+    doDigitalPullupRead();
+    sendBundle();
+  } 
+}
+
+
 

@@ -169,6 +169,15 @@ void routePWM(OSCMessage msg, int addrOffset ){
     if(pinMatched){
       //reset the message in case its a pattern being matched mutliple times
       msg.reset();
+      //tests if the pin is hardware PWM
+      if (msg.fullMatch("/h", addrOffset+pinMatched)){
+         char outputAddress[9];
+        strcpy(outputAddress, "/p");
+        strcat(outputAddress, numToOSCAddress(pin));
+        strcat(outputAddress,"/h");
+        //do the analog read and send the results
+        bundleOUT.addMessage(outputAddress).add(digitalPinHasPWM(pin));   
+      }
       //test if that pin is a PWM
       if (digitalPinHasPWM(pin)){
         //if it is, then analog write

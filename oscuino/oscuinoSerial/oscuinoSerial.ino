@@ -29,6 +29,7 @@ char * numToOSCAddress(int pin){
  */
 
 void lightShow(){
+  /*
   //if it says that LED_BUILTIN is not defined when compiling:
   //comment out the contents of this function. 
   digitalWrite(LED_BUILTIN, 1);
@@ -42,6 +43,7 @@ void lightShow(){
   digitalWrite(LED_BUILTIN, 1);
   delay(100);
   digitalWrite(LED_BUILTIN, 0);
+  */
 }
 
 /**
@@ -379,9 +381,7 @@ void bundleReceive(){
     bundleIN.route("/v", routeServo);
     bundleIN.route("/s", routeSystem);
     sendBundle();
-#if STEPPER_ENABLED
     bundleIN.route("/t", routeStepper);
-#endif
   }
 }
 

@@ -24,324 +24,306 @@
  */
 
 #include "OSCBundle.h"
+#include <stdlib.h>
 
-/*
- CONSTRUCTOR/DESTRUCTOR
- */
+ /*=============================================================================
+	CONSTRUCTORS / DESTRUCTOR
+=============================================================================*/
 
-OSCBundle::OSCBundle(Stream & s){
-	setTimetag(1);  
-	numMessages = 0;
-	stream = &s;
-	//no errors to start with
-	error = OSC_OK;
+OSCBundle::OSCBundle(uint64_t _timetag){
+    setTimetag(_timetag);
+    numMessages = 0;
+    error = OSC_OK;
+    messages = NULL;
+    incomingBuffer = NULL;
+    incomingBufferSize = 0;
+    decodeState = STANDBY;
 }
 
-OSCBundle::OSCBundle(){
-	//timetag = 1: happen instantly. 
-	setTimetag(1);  
-	numMessages = 0;
-	//no errors to start with
-	error = OSC_OK;
+OSCBundle::~OSCBundle(){
+    for (int i = 0; i < numMessages; i++){
+        OSCMessage * msg = getOSCMessage(i);
+        delete msg;
+    }
+    free(messages);
+    free(incomingBuffer);
 }
 
+/*=============================================================================
+ SETTERS
+ =============================================================================*/
 
-void OSCBundle::clear(){
-	//restart message and data pointer
-	numMessages = 0;
-	//set the default timetag
-	setImmediateTimetag(); 
-	//clear the errors
-	error = OSC_OK;
+OSCMessage & OSCBundle::add(char * _address){
+	OSCMessage * msg = new OSCMessage(_address);
+    if (!msg->hasError()){
+        //realloc the array to fit the message
+        OSCMessage ** messageMem = (OSCMessage **) realloc(messages, sizeof(OSCMessage *) * (numMessages + 1));
+        if (messageMem != NULL){
+            messages = messageMem;
+            messages[numMessages] = msg;
+            numMessages++;
+        } else {
+            error = ALLOCFAILED;
+        }
+    }
+    return *msg;
 }
 
-
-/*
- MESSAGE SETTER/GETTERS
- */
-
-OSCMessage* OSCBundle::currentMessage(){
-	return &OSCMessageBuffer[numMessages-1];
+OSCMessage & OSCBundle::add(){
+	OSCMessage * msg = new OSCMessage();
+    //realloc the array to fit the message
+    OSCMessage ** messageMem = (OSCMessage **) realloc(messages, sizeof(OSCMessage *) * (numMessages + 1));
+    if (messageMem != NULL){
+        messages = messageMem;
+        messages[numMessages] = msg;
+        numMessages++;
+    } else {
+        error = ALLOCFAILED;
+    }
+    return *msg;
 }
 
-OSCMessage* OSCBundle::nextMessage(){
-	if (numMessages < maxSize()) {
-		numMessages++;
-	} 
-	return currentMessage();
+OSCMessage & OSCBundle::add(OSCMessage & _msg){
+    OSCMessage * msg = new OSCMessage(_msg);
+    if (!msg->hasError()){
+        //realloc the array to fit the message
+        OSCMessage ** messageMem = (OSCMessage **) realloc(messages, sizeof(OSCMessage *) * (numMessages + 1));
+        if (messageMem != NULL){
+            messages = messageMem;
+            messages[numMessages] = msg;
+            numMessages++;
+        } else {
+            error = ALLOCFAILED;
+        }
+    }
+    return *msg;
 }
 
-uint8_t * OSCBundle::getEndOfMessageBuffer(){
-	//if it's the first message
-	if (numMessages==0){
-		//the message data starts at the beginning of the buffer
-		return OSCDataBuffer;
-	} else {
-		//otherwise the next message starts at the end of the current message
-		return currentMessage()->getEndOfMessage();
-	}
-}
-
-int OSCBundle::bufferBytesRemaining(uint8_t * end){
-	return (OSC_BUNDLE_SIZE - (end-OSCDataBuffer));
-}
-
-OSCMessage& OSCBundle::addMessage(char * _address, int len){
-	//the next message starts at the end of the previous message's data
-	uint8_t * end = getEndOfMessageBuffer();
-	//start the message
-	int bytesLeft = bufferBytesRemaining(end);
-	return nextMessage()->start(_address, end, bytesLeft, len);
-}
-
-//TODO: add a message to the bundle
-OSCMessage& OSCBundle::addMessage(OSCMessage msg){
-
-}
+/*=============================================================================
+    GETTERS
+ =============================================================================*/
 
 //returns the first fullMatch.
-OSCMessage& OSCBundle::getMessage(char * addr){
+OSCMessage * OSCBundle::getOSCMessage( char * addr){
 	for (int i = 0; i < numMessages; i++){
-		if(OSCMessageBuffer[i].fullMatch(addr)){
-			return OSCMessageBuffer[i];
-		}
+        OSCMessage * msg = getOSCMessage(i);
+        if (msg->fullMatch(addr)){
+            return msg;
+        }
 	}
 }
 
 //the position is the same as the order they were declared in
-OSCMessage& OSCBundle::getMessage(int pos){
+OSCMessage * OSCBundle::getOSCMessage(int pos){
 	if (pos < numMessages){
-		return OSCMessageBuffer[pos];	
-	}
-	
+		return messages[pos];
+	} 
 }
 
-bool OSCBundle::dispatch(char * pattern, void (*callback)(OSCMessage), int initial_offset){
+/*=============================================================================
+    PATTERN MATCHING
+ =============================================================================*/
+
+
+bool OSCBundle::dispatch(const char * pattern, void (*callback)(OSCMessage&), int initial_offset){
 	bool called = false;
 	for (int i = 0; i < numMessages; i++){
-		called |= OSCMessageBuffer[i].dispatch(pattern, callback, initial_offset);
+        OSCMessage msg = getOSCMessage(i);
+		called |= msg.dispatch(pattern, callback, initial_offset);
 	}
 	return called;
 }
 
 
-bool OSCBundle::route(char * pattern, void (*callback)(OSCMessage, int), int initial_offset){
+bool OSCBundle::route(const char * pattern, void (*callback)(OSCMessage&, int), int initial_offset){
 	bool called = false;
 	for (int i = 0; i < numMessages; i++){
-		called |= OSCMessageBuffer[i].route(pattern, callback, initial_offset);
+        OSCMessage msg = getOSCMessage(i);
+		called |= msg.route(pattern, callback, initial_offset);
 	}
 	return called;
 }
+
+/*=============================================================================
+    SIZE
+ =============================================================================*/
+
 
 int OSCBundle::size(){
 	return numMessages;
 }
 
-int OSCBundle::maxSize(){
-	return OSC_BUNDLE_SIZE/8;
+/*=============================================================================
+ ERROR HANDLING
+ =============================================================================*/
+
+bool OSCBundle::hasError(){
+    bool retError = error != OSC_OK;
+    //test each of the data
+    for (int i = 0; i < numMessages; i++){
+        OSCMessage * msg = getOSCMessage(i);
+        retError |= msg->hasError();
+    }
+	return retError;
 }
 
-bool OSCBundle::isFull(){
-	return currentMessage()->hasError()==1;
-}
-
-/*
- SEND BUNDLE
- */
-
-//output a bundle of all of the messages to the stream
-//clears the buffers
-void OSCBundle::send(){ 
-	sendTo(*stream);
-}
-
-void OSCBundle::sendTo(Print &p){
-	//bundle header OSC 1.0
-	p.write("#bundle");	
-	p.write((uint8_t)0); //pad bundle
-	//timetag
-	printTimetag(p);
-	//print messages
-	for (int i = 0; i < numMessages; i++){
-		//OSCMessageBuffer[i].printNumBytes(*stream);
-		if (!OSCMessageBuffer[i].hasError()){
-			printInt(OSCMessageBuffer[i].bytes(), p);
-			OSCMessageBuffer[i].printTo(p);
-		}
-	}
-	//flush the stream to make sure everything was output
-	//p.flush();
-	//clear the bundle after it's been sent
-	clear();
+OSCErrorCode OSCBundle::getError(){
+    return error;
 }
 
 
-/*
- RECEIVING MESSAGES
- */
+/*=============================================================================
+ SENDING
+ =============================================================================*/
 
-int OSCBundle::receiveFrom(Stream &s){
-	clear();
-	bool valid = true;
-	while((s.available() > 0) && valid){
-		//read the first byte
-		uint8_t first = s.peek();
-		//get the end of the last message
-		uint8_t * end = getEndOfMessageBuffer();
-		int bytesLeft = bufferBytesRemaining(end);
-		switch (first) {
-			case '#': //the begining of a bundle
-				valid = valid && readBundleHeader(s);
-				break;
-			case '/': 
-				//this assumes only one message was received
-				//the max size of a message is the size of an OSC bundle. 
-				valid = valid && nextMessage()->receiveFrom(s, end, bytesLeft);
-				break;
-			default:
-				//parse the first four bytes assuming it's the message length
-				char sizeBuff[4];
-				sizeBuff[0] = s.read();
-				sizeBuff[1] = s.read();
-				sizeBuff[2] = s.read();
-				sizeBuff[3] = s.read();
-				int size = pointerToInt((uint8_t *) sizeBuff);
-				//if there is enough space in the buffer
-				if (bytesLeft >= size){
-					//read data from the stream into the next message
-					valid = valid && nextMessage()->receiveFrom(s, end, size);
-				} else {
-					valid = false;
-				}
-		}
-	} 
-	if (!valid) {
-		emptyIncomingStream(s);
-		clear();
-		return 0;
+void OSCBundle::send(Print &p){
+    //don't send a bundle with errors
+    if (hasError()){
+        return;
+    }
+    //write the bundle header
+    static uint8_t header[] = {'#', 'b', 'u', 'n', 'd', 'l', 'e', 0};
+    p.write(header, 8);
+    //write the timetag
+    uint64_t t64 = BigEndian(timetag);
+    uint8_t * tptr = (uint8_t *) &t64;
+    p.write(tptr, 8);
+    //send the messages
+    for (int i = 0; i < numMessages; i++){
+        OSCMessage * msg = getOSCMessage(i);
+        int msgSize = msg->bytes();
+        //turn the message size into a pointer
+        uint64_t s32 = BigEndian((uint32_t) msgSize);
+        uint8_t * sptr = (uint8_t *) &s32;
+        //write the messsage size
+        p.write(sptr, 4);
+        msg->send(p);
+    }
+}
+
+/*=============================================================================
+    FILLING
+ =============================================================================*/
+
+void OSCBundle::fill(uint8_t incomingByte){
+    decode(incomingByte);
+}
+
+void OSCBundle::fill(uint8_t * incomingBytes, int length){
+    while (length--){
+        decode(*incomingBytes++);
+    }
+}
+
+/*=============================================================================
+    DECODING
+ =============================================================================*/
+
+void OSCBundle::decodeTimetag(){
+    //parse the incoming buffer as a uint64
+    setTimetag(incomingBuffer);
+    //make sure the endianness is right
+    timetag = BigEndian(timetag);
+    decodeState = MESSAGE_SIZE;
+    clearIncomingBuffer();
+}
+
+void OSCBundle::decodeHeader(){
+    const char * header = "#bundle";
+    if (strcmp(header, (char *) incomingBuffer)!=0){
+        //otherwise go back to the top and wait for a new bundle header
+        decodeState = STANDBY;
+        error = INVALID_OSC;
+    } else {
+        decodeState = TIMETAG;
+    }
+    clearIncomingBuffer();
+}
+
+void OSCBundle::decodeMessage(uint8_t incomingByte){
+    //get the current message
+    if (numMessages > 0){
+       OSCMessage * lastMessage = messages[numMessages - 1];
+        //put the bytes in there
+        lastMessage->fill(incomingByte);
+        //if it's all done
+        if (incomingBufferSize == incomingMessageSize){
+            //move onto the next message
+            decodeState = MESSAGE_SIZE;
+            clearIncomingBuffer();
+        } else if (incomingBufferSize > incomingMessageSize){
+            error = INVALID_OSC;
+        }
+    }
+}
+
+//does not validate the incoming OSC for correctness
+void OSCBundle::decode(uint8_t incomingByte){
+    addToIncomingBuffer(incomingByte);
+    switch (decodeState){
+        case STANDBY:
+            if (incomingByte == '#'){
+                decodeState = HEADER;
+            } else if (incomingByte == '/'){
+                decodeState = MESSAGE;
+            }
+            break;
+        case HEADER:
+			if (incomingBufferSize == 8){
+                decodeHeader();
+                decodeState = TIMETAG;
+            }
+			break;
+		case TIMETAG:
+            if (incomingBufferSize == 8){
+                decodeTimetag();
+                decodeState = MESSAGE_SIZE;
+            }
+			break;
+		case MESSAGE_SIZE:
+            if (incomingBufferSize == 4){
+                //make sure the message size is valid
+                int32_t msgSize;
+                memcpy(&msgSize, incomingBuffer, 4);
+                msgSize = BigEndian(msgSize);
+                if (msgSize % 4 != 0 || msgSize == 0){
+                    error = INVALID_OSC;
+                } else {
+                    //add a message to the buffer
+                    decodeState = MESSAGE;
+                    incomingMessageSize = msgSize;
+                    clearIncomingBuffer();
+                    //add a new empty message
+                    add();
+                }
+            }
+            break;
+		case MESSAGE:
+            decodeMessage(incomingByte);
+            break;
+    }
+}
+
+
+/*=============================================================================
+ INCOMING BUFFER MANAGEMENT
+ =============================================================================*/
+
+void OSCBundle::addToIncomingBuffer(uint8_t incomingByte){
+    //realloc some space for the new byte and stick it on the end
+	incomingBuffer = (uint8_t *) realloc ( incomingBuffer, incomingBufferSize + 1);
+	if (incomingBuffer != NULL){
+		incomingBuffer[incomingBufferSize++] = incomingByte;
 	} else {
-		return numMessages;
+		error = ALLOCFAILED;
 	}
 }
 
-int OSCBundle::receive(){
-	receiveFrom(*stream);
+void OSCBundle::clearIncomingBuffer(){
+    incomingBufferSize = 0;
+    free(incomingBuffer);
+    incomingBuffer = NULL;
 }
 
 
-bool OSCBundle::readBundleHeader(Stream &s){
-	//read the first 16 bytes 
-	char buffer[16];
-	for (int i = 0; i < 16; i++){
-		buffer[i] = s.read();
-	}
-	//s.readBytes(buffer, 16);
-	//should equal "#bundle0" + timetag for OSC 1.0
-	if (strncmp(buffer, "#bundle", 7)==0){
-		setTimetag((uint8_t * ) buffer+8);
-		return true;
-	} else {
-		return false;
-	}
-
-}
-
-void OSCBundle::emptyIncomingStream(Stream &s){
-	while(s.available())
-		s.read();
-}
-
-
-
-/*
- TIMETAG
- TODO: make some kind of real timing capabilities here
- */
-
-uint8_t * OSCBundle::getTimetag(){
-	return timetag;
-}
-
-void OSCBundle::setTimetag(uint64_t time){
-	//timetag = time;
-}
-
-void OSCBundle::setTimetag(int16_t time){
-	uint8_t * timePtr = (uint8_t *) time;
-	timetag[LongMSB3] = 0;
-	timetag[LongMSB2] = 0;
-	timetag[LongMSB1] = 0;
-	timetag[LongMSB0] = 0;
-	timetag[LongLSB3] = 0;
-	timetag[LongLSB2] = 0;
-	timetag[LongLSB1] = *timePtr++;
-	timetag[LongLSB0] = *timePtr++;
-}
-
-void OSCBundle::setImmediateTimetag(){
-	timetag[LongMSB3] = 0;
-	timetag[LongMSB2] = 0;
-	timetag[LongMSB1] = 0;
-	timetag[LongMSB0] = 0;
-	timetag[LongLSB3] = 0;
-	timetag[LongLSB2] = 0;
-	timetag[LongLSB1] = 0;
-	timetag[LongLSB0] = 1;
-}
-
-void OSCBundle::setTimetag(uint8_t * time){
-	timetag[LongMSB3] = *time++;
-	timetag[LongMSB2] = *time++;
-	timetag[LongMSB1] = *time++;
-	timetag[LongMSB0] = *time++;
-	timetag[LongLSB3] = *time++;
-	timetag[LongLSB2] = *time++;
-	timetag[LongLSB1] = *time++;
-	timetag[LongLSB0] = *time++;
-}
-
-void OSCBundle::printTimetag(Print &p){
-	p.write(timetag[LongMSB3]);
-	p.write(timetag[LongMSB2]);
-	p.write(timetag[LongMSB1]);
-	p.write(timetag[LongMSB0]);
-	p.write(timetag[LongLSB3]);
-	p.write(timetag[LongLSB2]);
-	p.write(timetag[LongLSB1]);
-	p.write(timetag[LongLSB0]);
-}
-
-//POINTER/INT TRANSLATION
-
-int OSCBundle::pointerToInt(uint8_t * ptr){
-	union {
-		int32_t i;
-		uint8_t b[4];
-	} u;
-	u.b[MSB1] = *ptr++;
-	u.b[MSB0] = *ptr++;
-	u.b[LSB1] = *ptr++;
-	u.b[LSB0] = *ptr++;	
-	return u.i;
-}
-
-void OSCBundle::printInt(int i, Print &p){
-	union {
-		int32_t i;
-		uint8_t b[4];
-	} u;
-	u.i = int32_t(i);
-	p.write(u.b[MSB1]);
-	p.write(u.b[MSB0]);
-	p.write(u.b[LSB1]);
-	p.write(u.b[LSB0]);
-}
-
-void OSCBundle::intToPointer(uint8_t * buffer, int i){
-	uint8_t * ptr = (uint8_t *) (& i);
-	*buffer++ = ptr[MSB1];
-	*buffer++ = ptr[MSB0];
-	*buffer++ = ptr[LSB1]; 
-	*buffer++ = ptr[LSB0]; 
-}
 

@@ -4,7 +4,7 @@ OSCBundles and messages don't have any framing so there is no way
  
  To get around this problem, we use the SLIP encoding when transmitting over Serial
  
- You can read more about SLIP here:
+ Read more about SLIP here:
  http://www.cse.iitb.ac.in/~bestin/btech-proj/slip/x365.html
  
  SLIPEncodedSerial creates an object called 'SLIPSerial' which you can use

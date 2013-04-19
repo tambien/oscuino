@@ -26,142 +26,143 @@
 #ifndef OSCBUNDLE_h
 #define OSCBUNDLE_h
 
-
-#include <Stream.h>
-#include <HardwareSerial.h>
 #include "OSCMessage.h"
-
-//this is approximately the static size in bytes the bundle consumes in RAM
-#if (RAMEND < 1000)
-#define OSC_BUNDLE_SIZE 64
-#else
-#define OSC_BUNDLE_SIZE 256
-#endif
 
 class OSCBundle
 {
 
 private:
-	
-	//BUFFERS
-	
-	uint8_t OSCDataBuffer[OSC_BUNDLE_SIZE]; //stores all of the osc data
-	OSCMessage OSCMessageBuffer[OSC_BUNDLE_SIZE/8]; //array of messages
-	
-	//TODO: allow the user to set a buffer, or the buffer size!
-	
-	//GETTING/SETTING BUFFERS
-	
-	inline OSCMessage* currentMessage();
-	OSCMessage* nextMessage();
-	uint8_t * getEndOfMessageBuffer();
-	int bufferBytesRemaining(uint8_t *);
-	
-	//the current message position in the bundle
-	int position;
 
-	//the number of messages in the bundle
+/*=============================================================================
+	PRIVATE VARIABLES
+=============================================================================*/
+
+	//the array of messages contained in the bundle
+	OSCMessage ** messages;
+
+	//the number of messages in the array
 	int numMessages;
-	
-	//the error code the bundle has
-	OscErrorCode error; 
-	
-	//the timetag is 0 unless set by the user 
-	uint8_t timetag[8];
-	
-	//the stream where data is read from and written to
-	Stream * stream;
-	
-	//print an integer to the stream
-	void printInt(int i, Print &p);
-	
-	
-	//TIMETAG METHODS
-	
-	//prints the timetag to the stream
-	void printTimetag(Print &p);
-		
-	//RECEIVING METHODS
-	
-	//read a bundle
-	bool readBundleHeader(Stream &);
-		
-	//empties the incoming buffer
-	//called after a bad message is passed
-	void emptyIncomingStream(Stream &);
-	
-	//TRANSLATE POINTERS TO VALUES
-	inline int pointerToInt(uint8_t *);
-	inline void intToPointer(uint8_t *, int);
+    
+    uint64_t timetag;
+    
+    //error codes
+    OSCErrorCode error;
+    
+/*=============================================================================
+ DECODING INCOMING BYTES
+ =============================================================================*/
+    
+    //the decoding states for incoming bytes
+    enum DecodeState {
+        STANDBY,
+        HEADER,
+        TIMETAG,
+        MESSAGE_SIZE,
+        MESSAGE,
+    } decodeState;
+    
+    //stores incoming bytes until they can be decoded
+    uint8_t * incomingBuffer;
+    int incomingBufferSize;
+    
+    //the size of the incoming message
+    int incomingMessageSize;
+    
+    //adds a byte to the buffer
+    void addToIncomingBuffer(uint8_t);
+    //clears the incoming buffer
+    void clearIncomingBuffer();
+    
+    //decoding functions
+    void decode(uint8_t);
+    void decodeTimetag();
+    void decodeHeader();
+    void decodeMessage(uint8_t);
+    
+    //just a placeholder while filling
+    OSCMessage & add();
+
 
 public:
+
+/*=============================================================================
+	CONSTRUCTORS / DESTRUCTOR
+=============================================================================*/
 		
-	//CONSTRUCTOR
-	OSCBundle();
-	OSCBundle(Stream & s);
-	
+  	OSCBundle(uint64_t = 1);
+
 	//DESTRUCTOR
-	//clears the buffers/reinitialize the bundle
-	void clear();
+	~OSCBundle();
 	
-	//MESSAGE GETTING/SETTING
-	
+/*=============================================================================
+    SETTERS
+=============================================================================*/
+    
 	//start a new OSC Message in the bundle
-	OSCMessage& addMessage(char * address, int len = 1);
-	
+    OSCMessage & add( char * address);
+    //add with nothing in it produces an invalid osc message
 	//copies an existing message into the bundle
-	OSCMessage& addMessage(OSCMessage msg);
+	OSCMessage & add(OSCMessage & msg);
+    
+    template <typename T>
+    void setTimetag(T t){
+        timetag = (uint64_t) t;
+    }
+    //sets the timetag from a buffer
+    void setTimetag(uint8_t * buff){
+        memcpy(&timetag, buff, 8);
+    }
+    
+/*=============================================================================
+    GETTERS
+ =============================================================================*/
+
+    //gets the message the matches the address string
+	//will do regex matching
+	OSCMessage * getOSCMessage(char * addr);
 	
+	//get message by position
+	OSCMessage * getOSCMessage(int position);
+	
+/*=============================================================================
+    MATCHING
+=============================================================================*/
+
 	//if the bundle contains a message that matches the pattern, 
 	//call the function callback on that message
-	bool dispatch(char * pattern, void (*callback)(OSCMessage), int = 0);
+	bool dispatch(const char * pattern, void (*callback)(OSCMessage&), int = 0);
 	
 	//like dispatch, but allows for partial matches
 	//the address match offset is sent as an argument to the callback
-	bool route(char * pattern, void (*callback)(OSCMessage, int), int = 0);
+	bool route(const char * pattern, void (*callback)(OSCMessage&, int), int = 0);
 	
-	//gets the message the matches the address string
-	//will do regex matching
-	OSCMessage& getMessage(char * addr);
-	
-	//get message by position
-	OSCMessage& getMessage(int position);
-	
+/*=============================================================================
+     SIZE
+=============================================================================*/
 	//returns the number of messages in the bundle;
 	int size();
-	
-	//returns the maximum number of messagesthe bundle can hold
-	int maxSize();
-	
-	//true if there is space for no more messages
-	bool isFull();
-	
-	
-	//SEND/RECEIVE BUNDLE OVER TRANSPORT LAYER
-	
-	//returns the number of messages received
-	int receive();
-	
-	//receives from a specific stream
-	int receiveFrom(Stream &);
-	
-	//send all of the messages in the bundle and clear the buffer
-	void send(); 
-	
-	//send all of the messages to a printer
-	void sendTo(Print &); 
-	
-	//TIMETAG GET/SET
-	
-	//sets the val of the timetag
-	void setImmediateTimetag();
-	void setTimetag(uint64_t);
-	void setTimetag(int16_t);
-	void setTimetag(uint8_t *);
-	void setTimetag(uint32_t, uint32_t);
-
-	uint8_t * getTimetag();
-	
+    
+/*=============================================================================
+    ERROR
+ =============================================================================*/
+    
+	bool hasError();
+    
+	OSCErrorCode getError();
+    
+/*=============================================================================
+    SENDING
+ =============================================================================*/
+    
+    void send(Print &p);
+    
+/*=============================================================================
+    FILLING
+ =============================================================================*/
+    
+    void fill(uint8_t incomingByte);
+    
+    void fill(uint8_t * incomingBytes, int length);
 };
 
 #endif

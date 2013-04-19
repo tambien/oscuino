@@ -8,7 +8,9 @@
 
 
 /*
-  this example is meant to be used with the oscuinoTouchOSC layout for touchOSC
+  This example is meant to be used with the MAX/MSP 
+  to Arduino Interface called oscuinoSerial.maxpatch
+  
   */
 
 EthernetUDP Udp;
@@ -16,9 +18,8 @@ EthernetUDP Udp;
 OSCBundle bundle(Udp);
 OSCBundle bundleOUT(Udp);
 
-IPAddress ip(192,168,1,120);
-IPAddress gateway(128 , 32 , 122 , 254);
-IPAddress subnet(255 , 255 , 255 , 0);
+IPAddress ip(128, 32, 122, 252);
+IPAddress outIp(128, 32, 122, 125);
 
 unsigned int inPort = 8888;
 unsigned int outPort = 9999;
@@ -214,7 +215,7 @@ float getSupplyVoltage(){
     ADMUX = 0x40 | _BV(MUX4)| _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
     ADCSRB =  0;
     //  ADCSRB = DEFAULT_ADCSRB | (1<<MUX5);
-#elif  defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__)    || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+#elif  defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB1286__)    || defined(__AVR_ATmega1280__) 
     ADMUX = 0x40| _BV(MUX4) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1) ;
     ADCSRB =  0;
 #else
@@ -270,7 +271,6 @@ byte mac[] = {
 
 void setup() {
   //setup ethernet part
-  Serial.begin(38400);
   Ethernet.begin(mac,ip);
   Udp.begin(inPort);
 }
@@ -283,13 +283,13 @@ void loop(){
   //read the incoming message
   bundleReceive();
   polling();
-  sendBundle();
 }
 
 
 void bundleReceive(){ 
   int packetSize = Udp.parsePacket();
   if(packetSize){
+    Serial.println(packetSize);
     if (bundle.receive()>0){
       // "/*"  = "/\052" 
      //bc of a bug in the Arduino IDE, it won't compile with "/*" in a string.
@@ -297,6 +297,9 @@ void bundleReceive(){
      sendBundle();
      bundle.route("/d", handleDigital);
      sendBundle();
+     bundle.route("/s", handleSystem);
+     sendBundle();
+     bundle.route("/p", handlePolling);
     }
   }
 }
@@ -304,8 +307,7 @@ void bundleReceive(){
 void sendBundle(){
   //send the outgoing message
   if(bundleOUT.size()){
-    Udp.beginPacket(Udp.remoteIP(), outPort);
-    //Udp.beginPacket(outIP, outPort);
+    Udp.beginPacket(outIp, outPort);
     bundleOUT.send();
     Udp.endPacket();
   } 
@@ -324,10 +326,10 @@ void routeAnalogPullup(OSCMessage msg, int addrOffset ){
       //reset the message in case its a pattern being matched mutliple times
       msg.reset();
       //if it has an value then it's an output with that value
-      if (msg.isFloat()){
-        int pullup = (int) msg.getFloat();
+      if (msg.isInt()){
+        int pullup = msg.getInt();
         pullupState[i] = pullup;
-        analogPullup(i, pullup);
+        analogPullup(i, pullup); 
       } 
     }
   }
@@ -341,6 +343,30 @@ inline int doAnalogRead(int pin){
 void handleAnalog(OSCMessage msg, int addrOffset ){
   //match analog pullup command
   msg.route("/up", routeAnalogPullup, addrOffset);
+  //match input or output
+  for(byte i = 0; i < ANALOG_PINS; i++){
+    //match against the pin numbers
+    if(msg.fullMatch(pinString[i], addrOffset)){
+      //reset the message in case its a pattern being matched mutliple times
+      msg.reset();
+      //if it has an value then it's an output with that value
+      if (msg.isInt()){
+        analogOutWrite(i, msg.getInt()); 
+      } else if (msg.isString()){
+        //if its a string then use that string is a custom address for the output
+        char addrBuff[16];
+        msg.getString(addrBuff);
+        bundleOUT.addMessage(addrBuff).add(doAnalogRead(i));
+      } else {
+        //otherwise just do an analog reading and send the value
+        char outputAddr[6] = "/a/xx";
+        //put the pin num in the output address
+        outputAddr[3] = pinString[i][1];
+        outputAddr[4] = pinString[i][2];
+        bundleOUT.addMessage(outputAddr).add(doAnalogRead(i));
+      }
+    } 
+  }
 }
 
 /*
@@ -353,8 +379,8 @@ void routeDigitalPullup(OSCMessage msg, int addrOffset ){
       //reset the message in case its a pattern being matched mutliple times
       msg.reset();
       //if it has an value then it's an output with that value
-      if (msg.isFloat()){
-        digitalPullup(i, (int) msg.getFloat()); 
+      if (msg.isInt()){
+        digitalPullup(i, msg.getInt()); 
       } 
     }
   }
@@ -367,6 +393,8 @@ inline int doDigitalRead(int pin){
 
 
 void handleDigital(OSCMessage msg, int addrOffset ){
+  //match analog pullup command
+  msg.route("/up", routeDigitalPullup, addrOffset);
   //match input or output
   for(byte i = 0; i < DIGITAL_PINS; i++){
     //match against the pin numbers
@@ -374,14 +402,49 @@ void handleDigital(OSCMessage msg, int addrOffset ){
       //reset the message in case its a pattern being matched mutliple times
       msg.reset();
       //if it has an value then it's an output with that value
-      if (msg.isFloat()){
+      if (msg.isInt()){
         pinMode(i, OUTPUT);
-        digitalWrite(i, (int) msg.getFloat()); 
-      } 
+        digitalWrite(i, msg.getInt()); 
+      } else if (msg.isString()){
+        //if its a string then use that string is a custom address for the output
+        char addrBuff[16];
+        msg.getString(addrBuff);
+        bundleOUT.addMessage(addrBuff).add(doDigitalRead(i));
+      } else {
+        //otherwise just do an analog reading and send the value
+        char outputAddr[6] = "/d/xx";
+        //put the pin num in the output address
+        outputAddr[3] = pinString[i][1];
+        outputAddr[4] = pinString[i][2];
+        bundleOUT.addMessage(outputAddr).add(doDigitalRead(i));
+      }
     } 
   }
 }
 
+/*
+ SYSTEM MESSAGES
+*/
+
+void handleSystem(OSCMessage msg, int addrOffset ){
+  if (msg.fullMatch("/t", addrOffset)){
+    bundleOUT.addMessage("/s/t").add(getTemperature());
+  }
+  if (msg.fullMatch("/p", addrOffset)){
+    bundleOUT.addMessage("/s/p").add(getSupplyVoltage());
+  }
+  if (msg.fullMatch("/m", addrOffset)){
+    bundleOUT.addMessage("/s/m").add(long(micros()));
+     
+  }
+  if (msg.fullMatch("/d", addrOffset)){
+    bundleOUT.addMessage("/s/d").add(DIGITAL_PINS);
+     
+  }
+  if (msg.fullMatch("/a", addrOffset)){
+    bundleOUT.addMessage("/s/a").add(ANALOG_PINS);
+  }
+}
 
 /*
  POLLING MESSAGES
@@ -394,9 +457,9 @@ void polling(){
       //otherwise just do an analog reading and send the value
       char outputAddr[6] = "/a/xx";
       //put the pin num in the output address
-      outputAddr[3] = pinString[i+1][1];
-      outputAddr[4] = pinString[i+1][2];
-      bundleOUT.addMessage(outputAddr).add(floatfrom10bitint(analogRead(i)));
+      outputAddr[3] = pinString[i][1];
+      outputAddr[4] = pinString[i][2];
+      bundleOUT.addMessage(outputAddr).add(doAnalogRead(i));
       msgCounter++;
       if (msgCounter>12){
         sendBundle();

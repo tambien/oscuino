@@ -24,330 +24,192 @@
  */
 
 #include "OSCMessage.h"
+#include "OSCMatch.h"
 
+/*=============================================================================
+	CONSTRUCTORS / DESTRUCTOR
+=============================================================================*/
 
-/*
- DATA BUFFER
- */
-
-//initialize static buffer
-uint8_t OSCMessage::messageBuffer[] = {0};
-
-
-/*
- DATA SIZE TESTS
- */
-
-void OSCMessage::incrementPosition(){
-	if (position >= dataSize){
-		reset();
-	} else {
-		position++;
-	}
+//constructor with address
+OSCMessage::OSCMessage(const char * _address){
+	setupMessage();
+    setAddress(_address);
 }
 
-bool OSCMessage::spaceForMore(int n){
-	//return true;
-	return ((msgBytes+n) <= maxMsgBytes);
-	//return ((position <= dataSize) && ((msgBytes+n) <= maxMsgBytes));
-}
-
-/*
- DATA BUFFER
- */
-
-void OSCMessage::setBuffer(uint8_t * buffer){
-	error = OSC_OK;
-	msgBytes = 0;
-	msgData = buffer;
-}
-
-void OSCMessage::addToBuffer(uint8_t data){
-	if (spaceForMore()){
-		msgData[msgBytes++] = data;	
-	} else {
-		error = BUFFER_FULL;
-	}
-}
-
-void OSCMessage::addToBuffer(uint8_t * data, int len){
-	if (spaceForMore(len)){
-		while(len--){
-			msgData[msgBytes++] = *data++;
-		}
-	} else {
-		error = BUFFER_FULL;
-	}
-}
-
-void OSCMessage::addToBuffer(int32_t data){
-	if (spaceForMore(4)){
-		uint8_t * ptr = (uint8_t *) (& data);
-		msgData[msgBytes++] = ptr[MSB1];
-		msgData[msgBytes++] = ptr[MSB0];
-		msgData[msgBytes++] = ptr[LSB1]; 
-		msgData[msgBytes++] = ptr[LSB0]; 
-	} else {
-		error = BUFFER_FULL;
-	}
-}
-
-void OSCMessage::addToBuffer(float data){
-	if(spaceForMore(4)){
-		uint8_t * ptr = (uint8_t *) (& data);
-		msgData[msgBytes++] = ptr[MSB1];
-		msgData[msgBytes++] = ptr[MSB0];
-		msgData[msgBytes++] = ptr[LSB1]; 
-		msgData[msgBytes++] = ptr[LSB0]; 
-	} else {
-		error = BUFFER_FULL;
-	}
-}
-
-
-uint8_t * OSCMessage::currentBufferPosition(){
-	return &msgData[msgBytes];
-}
-
-//pad the buffer starting at the current position
-void OSCMessage::addPadToBuffer(int amount){
-	if (spaceForMore(amount)){
-		while(amount--){
-			msgData[msgBytes++] = '\0';
-		}
-	}
-}
-
-void OSCMessage::addType(char type){
-	if (!error){
-		typePtr[position++] = type;
-	}
-}
-
-char OSCMessage::getType(){
-	return typePtr[position];
-}
-
-//DATA SECTION GETTERS
-
-int OSCMessage::getIntFromDataSection(){
-	union {
-		int32_t i;
-		uint8_t b[4];
-	} u;
-	u.b[MSB1] = *dataPtr++;
-	u.b[MSB0] = *dataPtr++;
-	u.b[LSB1] = *dataPtr++;
-	u.b[LSB0] = *dataPtr++;
-	return u.i;
-}
-
-float OSCMessage::getFloatFromDataSection(){
-	union {
-		float f;
-		uint8_t b[4];
-	} u;
-	u.b[MSB1] = *dataPtr++;
-	u.b[MSB0] = *dataPtr++;
-	u.b[LSB1] = *dataPtr++;
-	u.b[LSB0] = *dataPtr++;
-	return u.f;
-}
-
-/*
- SETUP MESSAGE
- */
+//constructor with nothing
+//just a placeholder since the message is invalid
 OSCMessage::OSCMessage(){
-	dataSize = 0;
-	msgBytes = 0;
-	msgData = messageBuffer;
-	error = OSC_OK;
+    setupMessage();
+    error = INVALID_OSC;
 }
 
-OSCMessage& OSCMessage::start(char * _address, int len){
-	//set the msg data to the beginning of the default buffer
-	setBuffer(messageBuffer);
-	maxBytes(OSC_MESSAGE_DEFAULT_BUFFER_SIZE);
-	//the length of the address
-	int addrLen = strlen(_address);
-	//set the address in memory
-	addToBuffer((uint8_t *) _address, addrLen );
-	//pad address
-	addPadToBuffer(padSize(addrLen));
-	//comma delimiter
-	addToBuffer(uint8_t(','));
-	//beginning of type section
-	typePtr = currentBufferPosition();
-	//jump to beginning of padding
-	msgBytes+=len;
-	//pad the type section
-	addPadToBuffer(padSize(len+1));
-	//beginning of data section
-	dataPtr = currentBufferPosition();
-	//number of datum
-	dataSize = len;
-	//read/write position in the message
-	position = 0;
-	return *this;
-}
-
-OSCMessage& OSCMessage::start(char * _address, uint8_t * buffer, int maximumBytes, int len){
-	//set the msg data to the beginning of the received buffer
-	setBuffer(buffer);
-	maxBytes(maximumBytes);
-	//the length of the address
-	int addrLen = strlen(_address);
-	//set the address in memory
-	addToBuffer((uint8_t *) _address, addrLen );
-	//pad address
-	addPadToBuffer(padSize(addrLen));
-	//comma delimiter
-	addToBuffer(uint8_t(','));
-	//beginning of type section
-	typePtr = currentBufferPosition();
-	//jump to beginning of padding
-	msgBytes+=len;
-	//pad the type section
-	addPadToBuffer(padSize(len+1));
-	//beginning of data section
-	dataPtr = currentBufferPosition();
-	//number of datum
-	dataSize = len;
-	//read/write position in the message
-	position = 0;
-	return *this;
-}
-
-void OSCMessage::reset(){
-	//reset everything back to the beginning
-	position = 0;
-	error = OSC_OK;
-	typePtr = msgData;
-	while(*typePtr++ != ',');
-	dataPtr = typePtr+dataSize+padSize(dataSize+1);
-}
-
-//TODO: copy msg into the buffer and parse it
-void OSCMessage::copy(OSCMessage msg){
-	
-}
-
+//variable length constructor
+//for example OSCMessage msg("/address", "isf", 1, "two", 3.0);
 /*
- RECEIVE AND PARSE MESSAGE
+OSCMessage::OSCMessage(const char * _address, char * types, ... ){
+	setupMessage(_address);
+}
  */
 
-//TODO expand this for further validation
-bool OSCMessage::check(){
-	//is it word aligned
-	if ( (msgBytes % 4) != 0){
-		error = INVALID_MESSAGE;
-		return false;
+//sets up a new message
+void OSCMessage::setupMessage(){
+	address = NULL;
+	//setup the attributes
+	dataCount = 0;
+	error = OSC_OK;
+	//setup the space for data
+	data = NULL;
+    //setup for filling the message
+    incomingBuffer = NULL;
+    incomingBufferSize = 0;
+    //set the decode state
+    decodeState = STANDBY;
+}
+
+//DESTRUCTOR
+OSCMessage::~OSCMessage(){
+	//free everything that needs to be freed
+    //free the address
+	free(address);
+	//free each of hte data in the array
+	for (int i = 0; i < dataCount; i++){
+		OSCData * datum = getOSCData(i);
+		//explicitly destruct the data
+		//datum->~OSCData();
+		delete datum;
 	}
-	//does it start with a '/'?
-	if (msgData[0] != '/') {
-		error = INVALID_MESSAGE;
-		return false;
+	//and free the array
+	free(data);
+    //free the filling buffer
+    free(incomingBuffer);
+}
+
+//COPY
+OSCMessage::OSCMessage(OSCMessage * msg){
+	//start with a message with the same address
+    setupMessage();
+    setAddress(msg->address);
+	//add each of the data to the other message
+	for (int i = 0; i < msg->dataCount; i++){
+        add(msg->data[i]);
 	}
-	//it's valid
-	return true;
 }
 
-//TODO this should be parse with buffer as a param
-bool OSCMessage::parse(int numBytes){
-	//start with new stats;
-	position = 0;
-	dataSize = 0;
-	msgBytes = numBytes;
-	//set the beginning of the message
-	msgData = messageBuffer;
-	//move typePtr to beginning of types
-	typePtr = msgData;
-	while(*typePtr++ != ','); 
-	//count the size
-	uint8_t * counter = typePtr;
-	//count each of the types;
-	while (*counter++)
-		dataSize++;
-	//dataPtr is after the type + padding
-	dataPtr = counter+padSize(dataSize+1)-1;
-	//is the message well-formed?
-	return check();
+/*=============================================================================
+	GETTING DATA
+=============================================================================*/
+
+OSCData * OSCMessage::getOSCData(int position){
+	if (position < dataCount){
+		OSCData * datum = data[position];
+		return datum;
+	} else {
+		error = INDEX_OUT_OF_BOUNDS;
+        return NULL;
+	}
 }
 
-bool OSCMessage::parse(){
-	//start with new stats;
-	position = 0;
-	dataSize = 0;
-	//move typePtr to beginning of types
-	typePtr = msgData;
-	while(*typePtr++ != ','); 
-	//count the size
-	uint8_t * counter = typePtr;
-	//count each of the types;
-	while (*counter++)
-		dataSize++;
-	//dataPtr is after the type + padding
-	dataPtr = counter+padSize(dataSize+1)-1;
-	//is the message well-formed?
-	//return check();
-	return true;
+int OSCMessage::getInt(int position){
+	OSCData * datum = getOSCData(position);
+	if (!hasError()){
+		return datum->getInt();
+    } else {
+        return NULL;
+    }
 }
 
-bool OSCMessage::receiveFrom(Stream &s){
-	//load all of the bytes into the buffer
-	setBuffer(messageBuffer);
-	return receiveFrom(s, OSC_MESSAGE_DEFAULT_BUFFER_SIZE);
+float OSCMessage::getFloat(int position){
+	OSCData * datum = getOSCData(position);
+	if (!hasError()){
+		return datum->getFloat();
+    } else {
+        return NULL;
+    }
 }
 
-bool OSCMessage::receiveFrom(Stream &s, int numBytes){
-	if (s.available()){
-		while(s.available() && numBytes){
-			addToBuffer(uint8_t(s.read()));
-			numBytes--;
-		}
-		//parse the buffer
-		return parse();
+double OSCMessage::getDouble(int position){
+	OSCData * datum = getOSCData(position);
+	if (!hasError()){
+		return datum->getDouble();
+    } else {
+        return NULL;
+    }
+}
+
+int OSCMessage::getString(int position, char * buffer){
+	OSCData * datum = getOSCData(position);
+	if (!hasError()){
+		return datum->getString(buffer, datum->bytes);
+    } else {
+        return NULL;
+    }
+}
+
+int OSCMessage::getBlob(int position, uint8_t * buffer){
+	OSCData * datum = getOSCData(position);
+	if (!hasError()){
+		return datum->getBlob(buffer, datum->bytes);
+    } else {
+        return NULL;
+    }
+}
+
+char OSCMessage::getType(int position){
+	OSCData * datum = getOSCData(position);
+	if (!hasError()){
+		return datum->type;
+	} else {
+        return NULL;
+    }
+}
+
+/*=============================================================================
+	TESTING DATA
+=============================================================================*/
+
+bool OSCMessage::testType(int position, char type){
+	OSCData * datum = getOSCData(position);
+	if (!hasError()){
+		return datum->type == type;
 	} else {
 		return false;
 	}
 }
 
-bool OSCMessage::receiveFrom(Stream &s, uint8_t * buffer, int numBytes){
-	setBuffer(buffer);
-	maxBytes(numBytes);
-	return receiveFrom(s, numBytes);
+bool OSCMessage::isInt(int position){
+	return testType(position, 'i');
 }
 
-/*
- ADDRESS
- */
-
-
-int OSCMessage::getAddress(char * buffer, int offset){
-	char * addrStart = (char *) (msgData + offset);
-	int addrLen = strlen(addrStart);
-	for(int i = 0; i < addrLen; i++){
-		buffer[i] =  addrStart[i];
-	}
-	buffer[addrLen] = '\0';
-	return addrLen;
+bool OSCMessage::isFloat(int position){
+	return testType(position, 'f');
 }
 
-int OSCMessage::getAddress(char * buffer, int offset, int len){
-	char * addrStart = (char *) (msgData + offset);
-	for(int i = 0; i < len; i++){
-		buffer[i] =  addrStart[i];
-	}
-	buffer[len] = '\0';
-	return len;
+bool OSCMessage::isBlob(int position){
+	return testType(position, 'b');
+}
+
+bool OSCMessage::isChar(int position){
+	return testType(position, 'c');
+}
+
+bool OSCMessage::isString(int position){
+	return testType(position, 's');
+}
+
+bool OSCMessage::isDouble(int position){
+	return testType(position, 'd');
 }
 
 
-int OSCMessage::match(const char * address, int addr_offset){
+/*=============================================================================
+	PATTERN MATCHING
+=============================================================================*/
+
+int OSCMessage::match(const  char * pattern, int addr_offset){
 	int pattern_offset;
 	int address_offset;
-	int ret = osc_match((char *) (msgData + addr_offset), address, &pattern_offset, &address_offset);
-	char * next = (char *) (msgData + addr_offset + pattern_offset);
+	int ret = osc_match(address + addr_offset, pattern, &pattern_offset, &address_offset);
+	char * next = (char *) (address + addr_offset + pattern_offset);
 	if (ret==3){
 		return pattern_offset;
 	} else if (pattern_offset > 0 && *next == '/'){
@@ -357,14 +219,14 @@ int OSCMessage::match(const char * address, int addr_offset){
 	}
 }
 
-bool OSCMessage::fullMatch(const char * pattern, int addr_offset){
+bool OSCMessage::fullMatch( const char * pattern, int addr_offset){
 	int pattern_offset;
 	int address_offset;
-	int ret = osc_match((char *) msgData + addr_offset, pattern, &address_offset, &pattern_offset);
+	int ret = osc_match(address + addr_offset, pattern, &address_offset, &pattern_offset);
 	return (ret==3);
 }
 
-bool OSCMessage::dispatch(char * pattern, void (*callback)(OSCMessage), int addr_offset){
+bool OSCMessage::dispatch(const char * pattern, void (*callback)(OSCMessage &), int addr_offset){
 	if (fullMatch(pattern, addr_offset)){
 		callback(*this);
 		return true;
@@ -373,7 +235,7 @@ bool OSCMessage::dispatch(char * pattern, void (*callback)(OSCMessage), int addr
 	}
 }
 
-bool OSCMessage::route(char * pattern, void (*callback)(OSCMessage, int), int initial_offset){
+bool OSCMessage::route(const char * pattern, void (*callback)(OSCMessage &, int), int initial_offset){
 	int match_offset = match(pattern, initial_offset);
 	if (match_offset>0){
 		callback(*this, match_offset + initial_offset);
@@ -383,505 +245,350 @@ bool OSCMessage::route(char * pattern, void (*callback)(OSCMessage, int), int in
 	}
 }
 
+/*=============================================================================
+    ADDRESS
+ =============================================================================*/
 
-
-/*
- INTEGERS
- */
-
-//put data onto the dataPtr of the data array
-OSCMessage& OSCMessage::add(int data){
-	//add type
-	addType('i');
-	//add data;
-	addToBuffer(int32_t(data));
-	return *this;
+int OSCMessage::getAddress(char * buffer, int offset){
+    strcpy(buffer, address+offset);
+	return strlen(buffer);
 }
 
-//put data onto the dataPtr of the data array
-OSCMessage& OSCMessage::add(int32_t data){
-	//add type
-	addType('i');
-	//add data;
-	addToBuffer(data);
-	return *this;
+int OSCMessage::getAddress(char * buffer, int offset, int len){
+    strncpy(buffer, address+offset, len);
+	return strlen(buffer);
 }
 
-//put data onto the data part of the data array
-OSCMessage& OSCMessage::add(unsigned int data){
-	//add type
-	addType('i');
-	//add data;
-	addToBuffer(int32_t(data));
-	return *this;
-}
-
-int OSCMessage::getInt(){
-	//check position
-	incrementPosition(); 
-	//get the int from the data pointer
-	return getIntFromDataSection();
-}
-
-bool OSCMessage::isInt(){
-	return (getType()=='i');
-}
-
-
-/*
- FLOATING-POINT
- */
-
-OSCMessage& OSCMessage::add(float data){
-	//add type
-	addType('f');
-	//add data;
-	addToBuffer(data);
-	return *this;
-}
-
-OSCMessage& OSCMessage::add(double data){
-	//add type
-	addType('f');
-	//add data;
-	addToBuffer(float(data));
-	return *this;
-}
-
-float OSCMessage::getFloat(){
-	//check position
-	incrementPosition();
-	return getFloatFromDataSection();
-}
-
-bool OSCMessage::isFloat(){
-	char t = getType();
-	//if the type is double or float
-	return (t=='f')||(t=='d');
-}
-
-/*
- STRING
- */
-
-
-OSCMessage& OSCMessage::add(char * data) {
-	//first put in the type
-	addType('s');
-	//then the data
-	addToBuffer((uint8_t *) data, strlen(data));
-	//pad the string;
-	addPadToBuffer(padSize(strlen(data)));
-	return *this;
-}
-
-void OSCMessage::getString(char * buffer){
-	//check position
-	incrementPosition();
-	int strLen = 0;
-	while(*dataPtr){
-		*buffer++ = *dataPtr++;
-		strLen++;
-	}
-	//put the dataPtr at the beggining of the next data
-	dataPtr+=padSize(strLen);
-	//null terminated
-	*buffer = '\0';
-}
-
-bool OSCMessage::isString(){
-	return (getType()=='s');
-}
-
-/*
- BLOB
- */
-
-OSCMessage& OSCMessage::add(uint8_t * data, int len) {
-	//first put in the type
-	addType('b');
-	//then the length
-	addToBuffer(int32_t(len)); 
-	//then the data
-	addToBuffer(data, len); 
-	//pad the blob;
-	addPadToBuffer(padSize(len));
-	return *this;
-}
-
-int OSCMessage::getBlob(uint8_t * buffer){
-	incrementPosition();
-	//get the length
-	int len = getIntFromDataSection();
-	//fill the buffer
-	for (int i = 0; i < len; i++){
-		*buffer++ = *dataPtr++;
-	}
-	//put the dataPtr at the beggining of the next data
-	dataPtr+=padSize(len);
-	return len;
-}
-
-bool OSCMessage::isBlob(){
-	return (getType()=='b');
-}
-
-/*
- PRINTING
- */
-
-//DEPRECATE in favor of sendTo
-void OSCMessage::printTo(Print &p){
-	if (!error){
-		p.write(msgData, msgBytes);
+void OSCMessage::setAddress(const char * _address){
+    //free the previous address
+    free(address);
+    //copy the address
+	char * addressMemory = (char *) malloc( (strlen(_address) + 1) * sizeof(char) );
+	if (addressMemory == NULL){
+		error = ALLOCFAILED;
+		address = NULL;
+	} else {
+		strcpy(addressMemory, _address);
+		address = addressMemory;
 	}
 }
 
-void OSCMessage::sendTo(Print &p){
-	if (!error){
-		p.write(msgData, msgBytes);
-	}
+/*=============================================================================
+	SIZE
+=============================================================================*/
+
+int OSCMessage::padSize(int _bytes){
+    int space = (_bytes + 3) / 4;
+    space *= 4;
+	return space - _bytes;
 }
 
-/*
- SIZE
- */
-
+//returns the number of OSCData in the OSCMessage
 int OSCMessage::size(){
-	return dataSize;
+	return dataCount;
 }
 
 int OSCMessage::bytes(){
-	return  msgBytes;
+    int messageSize = 0;
+    //send the address
+    int addrLen = strlen(address) + 1;
+    messageSize += addrLen;
+    //padding amount
+    int addrPad = padSize(addrLen);
+    messageSize += addrPad;
+    //add the comma seperator
+    messageSize += 1;
+    //add the types
+    messageSize += dataCount;
+    //pad the types
+    int typePad = padSize(dataCount + 1);
+    if (typePad == 0){
+        typePad = 4;
+    }
+    messageSize+=typePad;
+    //then the data
+    for (int i = 0; i < dataCount; i++){
+        OSCData * datum = getOSCData(i);
+        messageSize+=datum->bytes;
+        messageSize += padSize(datum->bytes);
+    }
+    return messageSize;
 }
 
-void OSCMessage::maxBytes(int bytes){
-	maxMsgBytes = bytes;
+/*=============================================================================
+	ERROR HANDLING
+=============================================================================*/
+
+bool OSCMessage::hasError(){
+    bool retError = error != OSC_OK;
+    //test each of the data
+    for (int i = 0; i < dataCount; i++){
+        OSCData * datum = getOSCData(i);
+        retError |= datum->error != OSC_OK;
+    }
+	return retError;
 }
 
-uint8_t * OSCMessage::getEndOfMessage(){
-	return &msgData[msgBytes];//+1?
+OSCErrorCode OSCMessage::getError(){
+    return error;
 }
 
-int OSCMessage::padSize(int dataBytes){
-	dataBytes %= 4;
-	return (4-dataBytes);
+/*=============================================================================
+    SENDING
+ =============================================================================*/
+
+void OSCMessage::send(Print &p){
+    //don't send a message with errors
+    if (hasError()){
+        return;
+    }
+    uint8_t nullChar = '\0';
+    //send the address
+    int addrLen = strlen(address) + 1;
+    //padding amount
+    int addrPad = padSize(addrLen);
+    //write it to the stream
+    p.write((uint8_t *) address, addrLen);
+    //add the padding
+    while(addrPad--){
+        p.write(nullChar);
+    }
+    //add the comma seperator
+    p.write((uint8_t) ',');
+    //add the types
+    for (int i = 0; i < dataCount; i++){
+        p.write((uint8_t) getType(i));
+    }
+    //pad the types
+    int typePad = padSize(dataCount + 1);
+    if (typePad == 0){
+        typePad = 4;
+    }
+    while(typePad--){
+        p.write(nullChar);
+    }
+    //write the data
+    for (int i = 0; i < dataCount; i++){
+        OSCData * datum = getOSCData(i);
+        if (datum->type == 's'){
+            p.write(datum->data.b, datum->bytes);
+            int dataPad = padSize(datum->bytes);
+            while(dataPad--){
+                p.write(nullChar);
+            }
+        } else if(datum->type == 'b'){
+            p.write(datum->data.b, datum->bytes);
+            int dataPad = padSize(datum->bytes);
+            while(dataPad--){
+                p.write(nullChar);
+            }
+        } else if (datum->type == 'd'){
+            double d = BigEndian(datum->data.d);
+            uint8_t * ptr = (uint8_t *) &d;
+            p.write(ptr, 8);
+        } else {
+            uint32_t i = BigEndian(datum->data.i);
+            uint8_t * ptr = (uint8_t *) &i;
+            p.write(ptr, datum->bytes);
+        }
+    }
 }
 
-int OSCMessage::getPosition(){
-	return position;
+/*=============================================================================
+    FILLING
+ =============================================================================*/
+
+void OSCMessage::fill(uint8_t incomingByte){
+    decode(incomingByte);
 }
 
-/*
- ERROR HANDLING
- */
-
-OscErrorCode OSCMessage::hasError(){
-	return error;
+void OSCMessage::fill(uint8_t * incomingBytes, int length){
+    while (length--){
+        decode(*incomingBytes++);
+    }
 }
 
-/*
- Written by John MacCallum, The Center for New Music and Audio Technologies,
- University of California, Berkeley.  Copyright (c) 2009, The Regents of
- the University of California (Regents). 
- Permission to use, copy, modify, distribute, and distribute modified versions
- of this software and its documentation without fee and without a signed
- licensing agreement, is hereby granted, provided that the above copyright
- notice, this paragraph and the following two paragraphs appear in all copies,
- modifications, and distributions.
- 
- IN NO EVENT SHALL REGENTS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
- SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, ARISING
- OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF REGENTS HAS
- BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- 
- REGENTS SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
- THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- PURPOSE. THE SOFTWARE AND ACCOMPANYING DOCUMENTATION, IF ANY, PROVIDED
- HEREUNDER IS PROVIDED "AS IS". REGENTS HAS NO OBLIGATION TO PROVIDE
- MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
- */
-#include <string.h>
-#include <stdio.h>
+/*=============================================================================
+    DECODING
+ =============================================================================*/
 
-static int osc_match_star(const char *pattern, const char *address);
-static int osc_match_star_r(const char *pattern, const char *address);
-static int osc_match_single_char(const char *pattern, const char *address);
-static int osc_match_bracket(const char *pattern, const char *address);
-static int osc_match_curly_brace(const char *pattern, const char *address);
-
-int osc_match(const char *pattern, const char *address, int *pattern_offset, int *address_offset)
-{
-	if(!strcmp(pattern, address)){
-		*pattern_offset = strlen(pattern);
-		*address_offset = strlen(address);
-		return OSC_MATCH_ADDRESS_COMPLETE | OSC_MATCH_PATTERN_COMPLETE;
-	}
-	
-	const char *pattern_start;
-	const char *address_start;
-	
-	pattern_start = pattern;
-	address_start = address;
-	
-	*pattern_offset = 0;
-	*address_offset = 0;
-	
-	while(*address != '\0' && *pattern != '\0'){
-		if(*pattern == '*'){
-			if(!osc_match_star(pattern, address)){
-				return 0;
-			}
-			while(*pattern != '/' && *pattern != '\0'){
-				pattern++;
-			}
-			while(*address != '/' && *address != '\0'){
-				address++;
-			}
-		}else if(*address == '*'){
-			while(*pattern != '/' && *pattern != '\0'){
-				pattern++;
-			}
-			while(*address != '/' && *address != '\0'){
-				address++;
-			}
-		}else{
-			int n = 0;
-			if(!(n = osc_match_single_char(pattern, address))){
-				return 0;
-			}
-			if(*pattern == '['){
-				while(*pattern != ']'){
-					pattern++;
-				}
-				pattern++;
-				address++;
-			}else if(*pattern == '{'){
-				while(*pattern != '}'){
-					pattern++;
-				}
-				pattern++;
-				address += n;
-			}else{
-				pattern++;
-				address++;
-			}
-		}
-	}
-	
-	*pattern_offset = pattern - pattern_start;
-	*address_offset = address - address_start;
-	
-	int r = 0;
-	
-	if(*address == '\0') {
-		r |= OSC_MATCH_ADDRESS_COMPLETE;
-	}
-	
-	if(*pattern == '\0') {
-		r |= OSC_MATCH_PATTERN_COMPLETE;
-	}
-	
-	return r;
+void OSCMessage::decodeAddress(){
+    setAddress((char *) incomingBuffer);
+    //change the error from invalide message
+    error = OSC_OK;
+    clearIncomingBuffer();
 }
 
-static int osc_match_star(const char *pattern, const char *address)
-{
-	const char *address_start = address;
-	const char *pattern_start = pattern;
-	int num_stars = 0;
-	if(*address == '\0') { return 0; }
-	while(*address != '/' && *address != '\0'){
-		address++;
-	}
-	while(*pattern != '/' && *pattern != '\0'){
-		if(*pattern == '*'){
-			num_stars++;
-		}
-		pattern++;
-	}
-	pattern--;
-	address--;
-	switch(num_stars){
-		case 1:
-		{
-			const char *pp = pattern, *aa = address;
-			while(*pp != '*'){
-				if(!(osc_match_single_char(pp, aa))){
-					return 0;
-				}
-				if(*pp == ']' || *pp == '}'){
-					while(*pp != '[' && *pp != '{'){
-						pp--;
-					}
-				}
-				pp--;
-				aa--;
-			}
-		}
+void OSCMessage::decodeType(uint8_t incomingByte){
+    char type = incomingByte;
+    add(type);
+}
+
+void OSCMessage::decodeData(uint8_t incomingByte){
+    //get the first OSCData to re-set
+    for (int i = 0; i < dataCount; i++){
+        OSCData * datum = getOSCData(i);
+        if (datum->error == INVALID_OSC){
+            //set the contents of datum with the data received
+            switch (datum->type){
+                case 'i':
+                    if (incomingBufferSize == 4){
+                        //parse the buffer as an int
+                        union {
+                            uint32_t i;
+                            uint8_t b[4];
+                        } u;
+                        memcpy(u.b, incomingBuffer, 4);
+                        int dataVal = BigEndian(u.i);
+                        set(i, dataVal);
+                        clearIncomingBuffer();
+                    }
+                    break;
+                case 'f':
+                    if (incomingBufferSize == 4){
+                        //parse the buffer as an int
+                        union {
+                            float f;
+                            uint8_t b[4];
+                        } u;
+                        memcpy(u.b, incomingBuffer, 4);
+                        float dataVal = BigEndian(u.f);
+                        set(i, dataVal);
+                        clearIncomingBuffer();
+                    }
+                    break;
+                case 'd':
+                    if (incomingBufferSize == 8){
+                        //parse the buffer as an int
+                        union {
+                            double d;
+                            uint8_t b[8];
+                        } u;
+                        memcpy(u.b, incomingBuffer, 8);
+                        double dataVal = BigEndian(u.d);
+                        set(i, dataVal);
+                        clearIncomingBuffer();
+                    }
+                    break;
+                case 's':
+                    if (incomingByte == 0){
+                        char * str = (char *) incomingBuffer;
+                        set(i, str);
+                        clearIncomingBuffer();
+                        decodeState = DATA_PADDING;
+                    }
+                    break;
+                case 'b':
+                    if (incomingBufferSize > 4){
+                        //compute the expected blob size
+                        union {
+                            uint32_t i;
+                            uint8_t b[4];
+                        } u;
+                        memcpy(u.b, incomingBuffer, 4);
+                        int blobLength = BigEndian(u.i);
+                        if (incomingBufferSize == blobLength + 4){
+                            set(i, incomingBuffer + 4, blobLength);
+                            clearIncomingBuffer();
+                            decodeState = DATA_PADDING;
+                        }
+                        
+                    }
+                    break;
+            }
+            //break out of the for loop once we've selected the first invalid message
+            break;
+        } 
+    }
+}
+
+//does not validate the incoming OSC for correctness
+void OSCMessage::decode(uint8_t incomingByte){
+    addToIncomingBuffer(incomingByte);
+    switch (decodeState){
+        case STANDBY:
+            if (incomingByte == '/'){
+                decodeState = ADDRESS;
+            }
+            break;
+        case ADDRESS:
+			if (incomingByte == 0){
+				//end of the address
+				//decode the address
+                decodeAddress();
+				//next state
+				decodeState = ADDRESS_PADDING;
+			} 
 			break;
-		case 2:
-#if (OSC_MATCH_ENABLE_2STARS == 1)
-		{
-			const char *pp = pattern, *aa = address;
-			while(*pp != '*'){
-				if(!(osc_match_single_char(pp, aa))){
-					return 0;
-				}
-				if(*pp == ']' || *pp == '}'){
-					while(*pp != '[' && *pp != '{'){
-						pp--;
-					}
-				}
-				pp--;
-				aa--;
+		case ADDRESS_PADDING:
+            //it does not count the padding
+			if (incomingByte==','){
+				//next state
+				decodeState = TYPES;
+                clearIncomingBuffer();
 			}
-			aa++; // we want to start one character forward to allow the star to match nothing
-			const char *star2 = pp;
-			const char *test = aa;
-			int i = 0;
-			while(test > address_start){
-				pp = star2 - 1;
-				aa = test - 1;
-				i++;
-				while(*pp != '*'){
-					if(!osc_match_single_char(pp, aa)){
-						break;
-					}
-					if(*pp == ']' || *pp == '}'){
-						while(*pp != '[' && *pp != '{'){
-							pp--;
-						}
-					}
-					pp--;
-					aa--;
-				}
-				if(pp == pattern_start){
-					return 1;
-				}
-				test--;
-			}
-			return 0;
-		}
 			break;
-#else
-			return 0;
-#endif
-		default:
-#if (OSC_MATCH_ENABLE_NSTARS == 1)
-			return osc_match_star_r(pattern_start, address_start);
+		case TYPES:
+			if (incomingByte != 0){
+				//next state
+                decodeType(incomingByte);
+			} else {
+                decodeState = TYPES_PADDING;
+            }
+            //FALL THROUGH to test if it should go to the data state
+		case TYPES_PADDING: {
+                //compute the padding size for the types
+                //to determine the start of the data section
+                int typePad = padSize(dataCount + 1);
+                if (typePad == 0){
+                    typePad = 4;
+                }
+                if (incomingBufferSize == (typePad + dataCount)){
+                    clearIncomingBuffer();
+                    decodeState = DATA;
+                }
+            }
 			break;
-#else
-			return 0;
-#endif
-	}
-	return 1;
+		case DATA:
+            decodeData(incomingByte);
+            break;
+		case DATA_PADDING:{
+                //get hte last valid data
+                for (int i = dataCount - 1; i >= 0; i--){
+                    OSCData * datum = getOSCData(i);
+                    if (datum->error == OSC_OK){
+                        //compute the padding size for the data
+                        int dataPad = padSize(datum->bytes);
+                        if (incomingBufferSize == dataPad){
+                            clearIncomingBuffer();
+                            decodeState = DATA;
+                        }
+                        break;
+                    }
+                }
+            }
+			break;
+
+    }
 }
 
-#if (OSC_MATCH_ENABLE_NSTARS == 1)
-static int osc_match_star_r(const char *pattern, const char *address)
-{
-	if(*address == '/' || *address == '\0'){
-		if(*pattern == '/' || *pattern == '\0' || (*pattern == '*' && ((*(pattern + 1) == '/') || *(pattern + 1) == '\0'))){
-			return 1;
-		}else{
-			return 0;
-		}
-	}
-	if(*pattern == '*'){
-		if(osc_match_star_r(pattern + 1, address)){
-			return 1;
-		}else{
-			return osc_match_star_r(pattern, address + 1);
-		}
-	}else{
-		if(!osc_match_single_char(pattern, address)){
-			return 0;
-		}
-		if(*pattern == '[' || *pattern == '{'){
-			while(*pattern != ']' && *pattern != '}'){
-				pattern++;
-			}
-		}
-		return osc_match_star_r(pattern + 1, address + 1);
+
+/*=============================================================================
+    INCOMING BUFFER MANAGEMENT
+ =============================================================================*/
+
+void OSCMessage::addToIncomingBuffer(uint8_t incomingByte){
+    //realloc some space for the new byte and stick it on the end
+	incomingBuffer = (uint8_t *) realloc ( incomingBuffer, incomingBufferSize + 1);
+	if (incomingBuffer != NULL){
+		incomingBuffer[incomingBufferSize++] = incomingByte;
+	} else {
+		error = ALLOCFAILED;
 	}
 }
-#endif
 
-static int osc_match_single_char(const char *pattern, const char *address)
-{
-	switch(*pattern){
-		case '[':
-			return osc_match_bracket(pattern, address);
-		case ']':
-			while(*pattern != '['){
-				pattern--;
-			}
-			return osc_match_bracket(pattern, address);
-		case '{':
-			return osc_match_curly_brace(pattern, address);
-		case '}':
-			while(*pattern != '{'){
-				pattern--;
-			}
-			return osc_match_curly_brace(pattern, address);
-		case '?':
-			return 1;
-		default:
-			if(*pattern == *address){
-				return 1;
-			}else{
-				return 0;
-			}
-	}
-	return 0;
-}
-
-static int osc_match_bracket(const char *pattern, const char *address)
-{
-	pattern++;
-	int val = 1;
-	if(*pattern == '!'){
-		pattern++;
-		val = 0;
-	}
-	int matched = !val;
-	while(*pattern != ']' && *pattern != '\0'){
-		// the character we're on now is the beginning of a range
-		if(*(pattern + 1) == '-'){
-			if(*address >= *pattern && *address <= *(pattern + 2)){
-				matched = val;
-				break;
-			}else{
-				pattern += 3;
-			}
-		}else{
-			// just test the character
-			if(*pattern == *address){
-				matched = val;
-				break;
-			}
-			pattern++;
-		}
-	}
-	return matched;
-}
-
-static int osc_match_curly_brace(const char *pattern, const char *address)
-{
-	pattern++;
-	const char *ptr = pattern;
-	while(*ptr != '}' && *ptr != '\0' && *ptr != '/'){
-		while(*ptr != '}' && *ptr != '\0' && *ptr != '/' && *ptr != ','){
-			ptr++;
-		}
-		int n = ptr - pattern;
-		if(!strncmp(pattern, address, n)){
-			return n;
-		}else{
-			ptr++;
-			pattern = ptr;
-		}
-	}
-	return 0;
+void OSCMessage::clearIncomingBuffer(){
+    incomingBufferSize = 0;
+    free(incomingBuffer);
+    incomingBuffer = NULL;
 }
