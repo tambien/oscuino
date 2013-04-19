@@ -4,7 +4,7 @@ OSCBundles and messages don't have any framing so there is no way
  
  To get around this problem, we use the SLIP encoding when transmitting over Serial
  
- Read more about SLIP here:
+ You can read more about SLIP here:
  http://www.cse.iitb.ac.in/~bestin/btech-proj/slip/x365.html
  
  SLIPEncodedSerial creates an object called 'SLIPSerial' which you can use
@@ -12,21 +12,27 @@ OSCBundles and messages don't have any framing so there is no way
  plus an additional method which sends the SLIP END character (octal 300).
  */
 
-#include <OSCMessage.h>
+#include <OSCBundle.h>
 #include <SLIPEncodedSerial.h>
 
 //declare the bundle
-OSCMessage msg;
 
 void setup() {
   //begin SLIPSerial just like Serial
-  SLIPSerial.begin(38400);
+  SLIPSerial.begin(57600);
 }
 
 void loop(){
-  msg.start("/slipMessage").add("data");
-  msg.sendTo(SLIPSerial);
-  //send the END character to frame the message
-  SLIPSerial.endTransmission();
+ OSCBundle bndl;
+ //receive a bundle
+ while(SLIPSerial.available()){
+    bndl.fill(SLIPSerial.read());
+ }
+  //and echo it back
+ if (bndl.size()>0){
+    bndl.send(SLIPSerial);
+    SLIPSerial.endTransmission(); 
+ }
+ delay(100);
 }
 

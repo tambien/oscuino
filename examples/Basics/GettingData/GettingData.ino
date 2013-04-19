@@ -16,9 +16,9 @@ void setup() {
   Serial.begin(38400);
   //add a bunch of data to the bundle to 'get'
   bndl.addMessage("/ints", 3).add(0).add(1).add(2).add(3);
-  bndl.addMessage("/floats", 3).add(1.0).add(2.0).add(3.0);
+  bndl.addMessage("/floats", 3).add(1.0f).add(2.0f).add(3.0f);
   bndl.addMessage("/letters", 3).add("a").add("b").add("c");
-  bndl.addMessage("/mix", 3).add("a").add(2).add(3.0);
+  bndl.addMessage("/mix", 3).add("a").add(2).add(3.0f);
 }
 
 void loop(){

@@ -30,56 +30,50 @@ void setup() {
   Serial.begin(38400);
 }
 
-OSCMessage msg;
-
 void loop(){
   //a heavily patterned message address
-  msg.start("/{input,output}/[0-2]/[!ab]/*");
+  OSCMessage msg0("/{input,output}/[0-2]/[!ab]/*");
   //match will traverse as far as it can in the pattern
   //it returns the number of characters matched from the pattern
-  int patternOffset = msg.match("/input/1");
+  int patternOffset = msg0.match("/input/1");
   if (patternOffset>0){
     //string multiple 'match' methods together using the pattern offset parameter to continue matching where it left off
     //use 'fullMatch' to test if the entire pattern was matched. 
-    if(msg.fullMatch("/c/anything", patternOffset)){
+    if(msg0.fullMatch("/c/anything", patternOffset)){
       Serial.println("Match: '/input/1/c/anything' against the pattern '/{input,output}/[0-2]/[abc]/*'");
     }
   }
-
   //write over the other message address
-  msg.start("/partialMatch");
+  OSCMessage msg1("/partialMatch");
   //match will return 0 if it did not reach the end or a '/'
-  if(!msg.match("/partial")){
+  if(!msg1.match("/partial")){
     Serial.println("No Match: '/partial' against the pattern '/partialMatch'");
   }
-
-  msg.start("/output/[0-2]");
+  OSCMessage msg2("/output/[0-2]");
   //'route' is uses 'match' to allow for partial matches
   //it invokes the callback with the matched message and the pattern offset as parameters to the callback
-  msg.route("/output", routeOutput);
-  
+  msg2.route("/output", routeOutput);
   //'dispatch' uses 'fullMatch' so it does not allow for partial matches
   //invokes the callback with only one argument which is the matched message
-  msg.dispatch("/output/1", routeOutputOne);
-
+  msg2.dispatch("/output/1", routeOutputOne);
   delay(1000);
 }
 
 //called after matching '/output' 
 //the matched message and the number of matched characters as the parameters
-void routeOutput(OSCMessage msg, int patternOffset){
+void routeOutput(OSCMessage &msg, int patternOffset){
   Serial.println("Match: '/output'");
   //string multiple 'route' methods together using the pattern offset parameter. 
   msg.route("/0", routeZero, patternOffset);
 }
 
 //called after matching '/0'
-void routeZero(OSCMessage msg, int addressOffset){
+void routeZero(OSCMessage &msg, int addressOffset){
   Serial.println("Match: '/output/0'");
 }
 
 //called after matching '/output/1' 
-void routeOutputOne(OSCMessage msg){
+void routeOutputOne(OSCMessage &msg){
   Serial.println("Match: '/output/1'");
 }
 
@@ -93,29 +87,6 @@ void routeOutputOne(OSCMessage msg){
  * "/*" == "/\052" ==  "\/*"
  * 
  **/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

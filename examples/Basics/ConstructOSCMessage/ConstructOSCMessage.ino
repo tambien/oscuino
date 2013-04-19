@@ -1,29 +1,27 @@
+#include <OSCMessage.h>
+
 /*
 Make an OSC message and send it over serial
  */
 
-#include <OSCMessage.h>
 
 void setup() {
   Serial.begin(38400);
+//  Serial.remotePort();
 }
 
-//declare the message
-OSCMessage msg;
-
 void loop(){
-  //start the message with an address
-  msg.start("/analog/0");
-  //add some data
-  msg.add(analogRead(0));
-  //send it over Serial
-  msg.sendTo(Serial);
-  /*
-   each of these methods could also be composed together
-   since they return the message object. 
-   for example: 
-   msg.start("/analog/0").add(analogRead(0)).sendTo(Serial);
-    */
+  //the message takes an address as an required argument
+  OSCMessage msg("/address");
+  //add data of any type to the end of the message with 'add'";
+  msg.add(1).add(2.0f).add("three");
+  //to retrieve the message use the correct type and position
+  Serial.println(msg.getInt(0));
+  Serial.println(msg.getFloat(1));
+  char strBuffer[10];
+  msg.getString(2, strBuffer);
+  Serial.println(strBuffer);
+  delay(1000);
 }
 
 
