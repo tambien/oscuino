@@ -104,8 +104,8 @@ public:
  */
 template<typename T> static inline T BigEndian(const T& x)
 {
-    static const int one = 1;
-    static const char sig = *(char*)&one;
+    const int one = 1;
+    const char sig = *(char*)&one;
     if (sig == 0) return x; // for big endian machine just return the input
     T ret;
     int size = sizeof(T);
