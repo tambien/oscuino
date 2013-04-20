@@ -33,6 +33,5 @@ void loop(){
     bndl.send(SLIPSerial);
     SLIPSerial.endTransmission(); 
  }
- delay(100);
 }
 

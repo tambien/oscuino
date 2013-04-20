@@ -6,19 +6,27 @@ Extends the Serial class to encode SLIP over serial
 #define SLIPEncodedSerial_h
 
 #include <Stream.h>
-#include <HardwareSerial.h>
 #if defined(CORE_TEENSY)
 	//import the serial object
-	#include <usb_api.h>
+	#if defined (__MK20DX128__)
+#include <usb_serial.h>
+#else
+
+#include <usb_api.h>
+#endif
+#else
+#include <HardwareSerial.h>
 #endif
 
-
-#if (RAMEND < 1000)
+	#if defined (__MK20DX128__)
+#define SLIP_SERIAL_BUFFER_SIZE 256
+#elif (RAMEND < 1000)
 #define SLIP_SERIAL_BUFFER_SIZE 32
 #else
 #define SLIP_SERIAL_BUFFER_SIZE 128
 #endif
 
+// this is to buffer incoming packets
 struct slip_ring_buffer
 {
 	unsigned char buffer[SLIP_SERIAL_BUFFER_SIZE];

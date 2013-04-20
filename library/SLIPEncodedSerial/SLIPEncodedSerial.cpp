@@ -148,6 +148,8 @@ void SLIPEncodedSerial::begin(unsigned long baudrate){
 //signify the end of transmission
 void SLIPEncodedSerial::endTransmission(){
 	serial->write(eot);
+	serial->write(eot);
+
 }
 
 void SLIPEncodedSerial::flush(){
