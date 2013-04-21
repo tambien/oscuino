@@ -94,6 +94,9 @@ public:
 
 	//DESTRUCTOR
 	~OSCBundle();
+
+    //clears all of the OSCMessages inside
+    void empty();
 	
 /*=============================================================================
     SETTERS

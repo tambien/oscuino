@@ -49,6 +49,18 @@ OSCBundle::~OSCBundle(){
     free(incomingBuffer);
 }
 
+//clears all of the OSCMessages inside
+void OSCBundle::empty(){
+    error = OSC_OK;
+    for (int i = 0; i < numMessages; i++){
+        OSCMessage * msg = getOSCMessage(i);
+        delete msg;
+    }
+    free(messages);
+    messages = NULL;
+    numMessages = 0;
+}
+
 /*=============================================================================
  SETTERS
  =============================================================================*/

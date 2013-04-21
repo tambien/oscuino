@@ -18,9 +18,13 @@ void loop(){
   //to retrieve the message use the correct type and position
   Serial.println(msg.getInt(0));
   Serial.println(msg.getFloat(1));
-  char strBuffer[10];
-  msg.getString(2, strBuffer);
+  char strBuffer[msg.getDataBytes(2)];
+  msg.getString(2, strBuffer, 10);
   Serial.println(strBuffer);
+  msg.empty();
+  Serial.println(msg.size());
+  msg.add(1);
+  Serial.println(msg.size());
   delay(1000);
 }
 

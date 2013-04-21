@@ -121,6 +121,9 @@ public:
 	//DESTRUCTOR
 	~OSCMessage();
 
+	//empties all of the data
+	void empty();
+
 /*=============================================================================
 	SETTING  DATA
 =============================================================================*/
@@ -239,6 +242,9 @@ public:
 	int getString(int, char *, int);
 	//returns the number of unsigned int8's copied into the buffer
 	int getBlob(int, uint8_t *, int);
+
+	//returns the number of bytes of the data at that position
+	int getDataBytes(int);
 
 	//returns the type at the position
 	char getType(int);

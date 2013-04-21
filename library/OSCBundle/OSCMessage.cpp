@@ -71,17 +71,25 @@ OSCMessage::~OSCMessage(){
 	//free everything that needs to be freed
     //free the address
 	free(address);
-	//free each of hte data in the array
-	for (int i = 0; i < dataCount; i++){
-		OSCData * datum = getOSCData(i);
-		//explicitly destruct the data
-		//datum->~OSCData();
-		delete datum;
-	}
-	//and free the array
-	free(data);
+    //free the data
+    empty();
     //free the filling buffer
     free(incomingBuffer);
+}
+
+void OSCMessage::empty(){
+    error = OSC_OK;
+    //free each of hte data in the array
+    for (int i = 0; i < dataCount; i++){
+        OSCData * datum = getOSCData(i);
+        //explicitly destruct the data
+        //datum->~OSCData();
+        delete datum;
+    }
+    //and free the array
+    free(data);
+    data = NULL;
+    dataCount = 0;
 }
 
 //COPY
@@ -164,6 +172,15 @@ char OSCMessage::getType(int position){
 		return datum->type;
 	} else {
         return NULL;
+    }
+}
+
+int OSCMessage::getDataBytes(int position){
+    OSCData * datum = getOSCData(position);
+    if (!hasError()){
+        return datum->bytes;
+    } else {
+        return 0;
     }
 }
 
