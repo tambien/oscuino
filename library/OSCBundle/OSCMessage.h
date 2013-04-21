@@ -231,13 +231,14 @@ public:
 	getters take a position as an argument
 =============================================================================*/
 
-	int getInt(int);
+	int32_t getInt(int);
 	float getFloat(int);
 	double getDouble(int);
+
 	//return the copied string's length
-	int getString(int, char *);
+	int getString(int, char *, int);
 	//returns the number of unsigned int8's copied into the buffer
-	int getBlob(int, uint8_t *);
+	int getBlob(int, uint8_t *, int);
 
 	//returns the type at the position
 	char getType(int);

@@ -109,7 +109,7 @@ OSCData * OSCMessage::getOSCData(int position){
 	}
 }
 
-int OSCMessage::getInt(int position){
+int32_t OSCMessage::getInt(int position){
 	OSCData * datum = getOSCData(position);
 	if (!hasError()){
 		return datum->getInt();
@@ -136,19 +136,23 @@ double OSCMessage::getDouble(int position){
     }
 }
 
-int OSCMessage::getString(int position, char * buffer){
+int OSCMessage::getString(int position, char * buffer, int bufferSize){
 	OSCData * datum = getOSCData(position);
 	if (!hasError()){
-		return datum->getString(buffer, datum->bytes);
+        //the number of bytes to copy is the smaller between the buffer size and the datum's byte length
+        int copyBytes = bufferSize < datum->bytes? bufferSize : datum->bytes;
+		return datum->getString(buffer, copyBytes);
     } else {
         return NULL;
     }
 }
 
-int OSCMessage::getBlob(int position, uint8_t * buffer){
+int OSCMessage::getBlob(int position, uint8_t * buffer, int bufferSize){
 	OSCData * datum = getOSCData(position);
 	if (!hasError()){
-		return datum->getBlob(buffer, datum->bytes);
+        //the number of bytes to copy is the smaller between the buffer size and the datum's byte length
+        int copyBytes = bufferSize < datum->bytes? bufferSize : datum->bytes;
+		return datum->getBlob(buffer, copyBytes);
     } else {
         return NULL;
     }

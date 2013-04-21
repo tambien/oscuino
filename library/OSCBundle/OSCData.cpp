@@ -32,6 +32,13 @@ OSCData::OSCData(int i){
 	data.i = i32;
 }
 
+OSCData::OSCData(int32_t i){
+	error = OSC_OK;
+	type = 'i';
+	bytes = sizeof(i);
+	data.i = i;
+}
+
 
 OSCData::OSCData(float f){
 	error = OSC_OK;
@@ -123,7 +130,7 @@ OSCData::OSCData(char t){
     otherwise returns NULL
 =============================================================================*/
 
-int OSCData::getInt(){
+int32_t OSCData::getInt(){
     if (type == 'i'){
         return data.i;
     } else {

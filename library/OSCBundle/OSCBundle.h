@@ -89,6 +89,7 @@ public:
 	CONSTRUCTORS / DESTRUCTOR
 =============================================================================*/
 		
+    //default timetag of 1
   	OSCBundle(uint64_t = 1);
 
 	//DESTRUCTOR

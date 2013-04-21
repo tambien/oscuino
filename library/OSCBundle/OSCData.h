@@ -73,6 +73,7 @@ public:
 	//overload the constructor to account for all the types and sizes
 	OSCData(const char * s);
 	OSCData (int);
+	OSCData (int32_t);
 	OSCData (float);
 	OSCData (double);
 	OSCData (uint8_t *, int);
@@ -83,7 +84,7 @@ public:
 	~OSCData();
     
     //GETTERS
-    int getInt();
+    int32_t getInt();
     float getFloat();
     double getDouble();
     int getString(char *, int);
@@ -102,7 +103,8 @@ public:
  if the system is little endian, it will flip the bits
  if the system is big endian, it'll do nothing
  */
-template<typename T> static inline T BigEndian(const T& x)
+template<typename T> 
+static inline T BigEndian(const T& x)
 {
     const int one = 1;
     const char sig = *(char*)&one;
