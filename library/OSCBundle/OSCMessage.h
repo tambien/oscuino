@@ -244,7 +244,7 @@ public:
 	int getBlob(int, uint8_t *, int);
 
 	//returns the number of bytes of the data at that position
-	int getDataBytes(int);
+	int getDataLength(int);
 
 	//returns the type at the position
 	char getType(int);

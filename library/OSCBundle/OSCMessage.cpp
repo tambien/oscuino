@@ -175,7 +175,7 @@ char OSCMessage::getType(int position){
     }
 }
 
-int OSCMessage::getDataBytes(int position){
+int OSCMessage::getDataLength(int position){
     OSCData * datum = getOSCData(position);
     if (!hasError()){
         return datum->bytes;
