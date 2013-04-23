@@ -13,25 +13,39 @@ OSCBundles and messages don't have any framing so there is no way
  */
 
 #include <OSCBundle.h>
+#if defined(CORE_TEENSY)
+#include <SLIPEncodedUSBSerial.h>
+#else
 #include <SLIPEncodedSerial.h>
+#endif
+
+#if defined(CORE_TEENSY)
+SLIPEncodedUSBSerial SLIPSerial(Serial);
+#else
+SLIPEncodedSerial SLIPSerial(Serial);
+#endif
 
 //declare the bundle
 
 void setup() {
   //begin SLIPSerial just like Serial
-  SLIPSerial.begin(57600);
+  Serial.begin(57600);
 }
 
 void loop(){
  OSCBundle bndl;
  //receive a bundle
- while(SLIPSerial.available()){
-    bndl.fill(SLIPSerial.read());
+ while(!SLIPSerial.endofPacket()){
+   int size;
+    if ((size =SLIPSerial.available()) > 0){
+       while(size--)
+          bndl.fill(SLIPSerial.read());
+     }
  }
   //and echo it back
  if (bndl.size()>0){
     bndl.send(SLIPSerial);
-    SLIPSerial.endTransmission(); 
+    SLIPSerial.endPacket();
  }
 }
 

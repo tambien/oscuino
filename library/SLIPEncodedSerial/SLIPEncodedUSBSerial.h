@@ -2,27 +2,31 @@
 Extends the Serial class to encode SLIP over serial
 */
 
-#ifndef SLIPEncodedSerial_h
-#define SLIPEncodedSerial_h
+#ifndef SLIPEncodedUSBSerial_h
+#define SLIPEncodedUSBSerial_h
 
 #include <Stream.h>
-#include <HardwareSerial.h>
+#if defined(CORE_TEENSY)
+	//import the serial object
+#if defined (__MK20DX128__)
+#include <usb_serial.h>
+#else
+#include <usb_api.h>
+#endif
 
 
-class SLIPEncodedSerial: public Stream{
+
+class SLIPEncodedUSBSerial: public Stream{
 	
 private:
 	enum erstate {CHAR, FIRSTEOT, SECONDEOT, SLIPESC } rstate;
 	
-	//the serial port used
-	HardwareSerial * serial;
-
+	usb_serial_class * serial;
 	
 public:
 	
-	//the serial port used
-	SLIPEncodedSerial(HardwareSerial & );
-
+//different constructor for teensies
+	SLIPEncodedUSBSerial(usb_serial_class &  );
 	
 	int available();
 	int read();
@@ -48,6 +52,8 @@ public:
 #endif
 
 };
+#endif
+
 
 
 #endif

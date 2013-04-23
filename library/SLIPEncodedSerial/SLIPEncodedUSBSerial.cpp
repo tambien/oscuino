@@ -1,11 +1,16 @@
-#include <SLIPEncodedSerial.h>
+#include <SLIPEncodedUSBSerial.h>
 
 /*
  CONSTRUCTOR
  */
 //instantiate with the tranmission layer
+
+//different constructor for teensies
+#if defined(CORE_TEENSY)
+
+
 //use HardwareSerial
-SLIPEncodedSerial::SLIPEncodedSerial(HardwareSerial &s){
+SLIPEncodedUSBSerial::SLIPEncodedUSBSerial(usb_serial_class &s){
 	serial = &s;
 	rstate = CHAR;
 }
@@ -17,7 +22,7 @@ static const uint8_t slipescesc = 0335;
 /*
  SERIAL METHODS
  */
-bool SLIPEncodedSerial::endofPacket()
+bool SLIPEncodedUSBSerial::endofPacket()
 {
 	if(rstate == SECONDEOT)
 	{
@@ -36,7 +41,7 @@ bool SLIPEncodedSerial::endofPacket()
 	}
 	return false;
 }
-int SLIPEncodedSerial::available(){
+int SLIPEncodedUSBSerial::available(){
 back:
 	int cnt = serial->available();
 	
@@ -79,7 +84,7 @@ back:
 }
 
 //reads a byte from the buffer
-int SLIPEncodedSerial::read(){
+int SLIPEncodedUSBSerial::read(){
 back:
 	uint8_t c = serial->read();
 	if(rstate==CHAR)
@@ -93,6 +98,7 @@ back:
 		
 			return -1; // xxx this is an error
 		}
+
 		return c;
 	}
 	else
@@ -114,7 +120,7 @@ back:
 }
 
 // as close as we can get to correct behavior
-int SLIPEncodedSerial::peek(){
+int SLIPEncodedUSBSerial::peek(){
 	uint8_t c = serial->peek();
 	if(rstate==SLIPESC)
 	{
@@ -130,7 +136,7 @@ int SLIPEncodedSerial::peek(){
 #ifdef WIRING
 
 //encode SLIP
- void SLIPEncodedSerial::write(uint8_t b){
+ void SLIPEncodedUSBSerial::write(uint8_t b){
 	if(b == eot){ 
 		serial->write(slipesc);
 		return serial->write(slipescend); 
@@ -144,7 +150,7 @@ int SLIPEncodedSerial::peek(){
 
 #else
 //encode SLIP
-size_t SLIPEncodedSerial::write(uint8_t b){
+size_t SLIPEncodedUSBSerial::write(uint8_t b){
 	if(b == eot){ 
 		serial->write(slipesc);
 		return serial->write(slipescend); 
@@ -158,17 +164,19 @@ size_t SLIPEncodedSerial::write(uint8_t b){
 
 #endif
 
-void SLIPEncodedSerial::begin(unsigned long baudrate){
+void SLIPEncodedUSBSerial::begin(unsigned long baudrate){
 	serial->begin(baudrate);
 }
 
 //signify the end of the packet with two EOT's
-void SLIPEncodedSerial::endPacket(){
+void SLIPEncodedUSBSerial::endPacket(){
 	serial->write(eot);
 	serial->write(eot);
+    serial->send_now();
 }
 
-void SLIPEncodedSerial::flush(){
+void SLIPEncodedUSBSerial::flush(){
 	serial->flush();
 }
+#endif
 
